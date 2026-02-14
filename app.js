@@ -12,6 +12,7 @@ const palette = ["#3ad0ff", "#12c48b", "#f6a928", "#ff6262", "#8cc3ff", "#ff9f6f
 
 let valueChart = null;
 let exposureChart = null;
+let selectedDecisionId = null;
 
 const el = {
   statusMessage: document.getElementById("statusMessage"),
@@ -31,6 +32,20 @@ const el = {
   latestReason: document.getElementById("latestReason"),
   latestRisk: document.getElementById("latestRisk"),
   latestError: document.getElementById("latestError"),
+  newsSummary: document.getElementById("newsSummary"),
+  newsList: document.getElementById("newsList"),
+  inspectTime: document.getElementById("inspectTime"),
+  inspectSymbol: document.getElementById("inspectSymbol"),
+  inspectActionBadge: document.getElementById("inspectActionBadge"),
+  inspectConfidence: document.getElementById("inspectConfidence"),
+  inspectPrice: document.getElementById("inspectPrice"),
+  inspectSentiment: document.getElementById("inspectSentiment"),
+  inspectReason: document.getElementById("inspectReason"),
+  inspectRisk: document.getElementById("inspectRisk"),
+  inspectExecution: document.getElementById("inspectExecution"),
+  inspectHeadline: document.getElementById("inspectHeadline"),
+  inspectHeadlineLink: document.getElementById("inspectHeadlineLink"),
+  inspectError: document.getElementById("inspectError"),
   decisionsTableBody: document.getElementById("decisionsTableBody"),
   positionsTableBody: document.getElementById("positionsTableBody"),
   tradesTableBody: document.getElementById("tradesTableBody"),
@@ -70,6 +85,17 @@ function maybeFixText(value) {
   }
 }
 
+function truncateText(value, maxLength = 180) {
+  const text = maybeFixText(value);
+  if (!text) {
+    return "";
+  }
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength - 1).trimEnd()}…`;
+}
+
 function formatDate(value, withSeconds = false) {
   const date = value instanceof Date ? value : parseDate(value);
   if (!date) {
@@ -80,6 +106,109 @@ function formatDate(value, withSeconds = false) {
     timeStyle: withSeconds ? "medium" : "short",
     hour12: false
   }).format(date);
+}
+
+function formatQty(value) {
+  const qty = toNumber(value);
+  if (qty === null) {
+    return "-";
+  }
+  return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 6 }).format(qty);
+}
+
+function getDecisionSymbol(entry) {
+  return entry?.symbol || entry?.decision?.symbol || entry?.execution?.symbol || "-";
+}
+
+function getDecisionId(entry) {
+  if (!entry) {
+    return "";
+  }
+  const timestamp = entry.timestamp_utc || "";
+  const symbol = getDecisionSymbol(entry);
+  const action = getAction(entry);
+  return `${timestamp}|${symbol}|${action}`;
+}
+
+function getMostImpactfulHeadline(entry) {
+  const sentiment = entry?.news_sentiment || {};
+  if (sentiment?.most_impactful_headline && typeof sentiment.most_impactful_headline === "object") {
+    return sentiment.most_impactful_headline;
+  }
+  if (Array.isArray(sentiment.top_headlines_used) && sentiment.top_headlines_used.length) {
+    return sentiment.top_headlines_used[0];
+  }
+  return null;
+}
+
+function getEntryHeadlines(entry) {
+  const sentiment = entry?.news_sentiment || {};
+  const list = [];
+  const impactful = getMostImpactfulHeadline(entry);
+  if (impactful) {
+    list.push(impactful);
+  }
+
+  if (Array.isArray(sentiment.top_headlines_used)) {
+    list.push(...sentiment.top_headlines_used);
+  }
+
+  return list;
+}
+
+function normalizeHeadline(rawHeadline, fallbackTimestamp, symbol) {
+  if (!rawHeadline || typeof rawHeadline !== "object") {
+    return null;
+  }
+
+  const title = maybeFixText(rawHeadline.title);
+  if (!title) {
+    return null;
+  }
+
+  const publishedAt =
+    parseDate(rawHeadline.published_utc || rawHeadline.published_at || rawHeadline.date) ||
+    parseDate(fallbackTimestamp);
+
+  return {
+    title,
+    source: maybeFixText(rawHeadline.source || "Source inconnue"),
+    excerpt: maybeFixText(rawHeadline.excerpt || ""),
+    link: maybeFixText(rawHeadline.link || ""),
+    sentimentScore: toNumber(rawHeadline.sentiment_score),
+    publishedAt,
+    symbol: symbol || "-"
+  };
+}
+
+function collectLatestHeadlines(decisions, limit = 8) {
+  const dedup = new Map();
+
+  for (let index = decisions.length - 1; index >= 0; index -= 1) {
+    const entry = decisions[index];
+    const symbol = getDecisionSymbol(entry);
+    const entryHeadlines = getEntryHeadlines(entry);
+
+    for (const headline of entryHeadlines) {
+      const normalized = normalizeHeadline(headline, entry?.timestamp_utc, symbol);
+      if (!normalized) {
+        continue;
+      }
+
+      const key = normalized.link || `${normalized.source}|${normalized.title}`;
+      const existing = dedup.get(key);
+      const existingTime = existing?.publishedAt?.getTime() || 0;
+      const candidateTime = normalized?.publishedAt?.getTime() || 0;
+
+      if (!existing || candidateTime > existingTime) {
+        dedup.set(key, normalized);
+      }
+    }
+  }
+
+  return Array.from(dedup.values())
+    .sort((a, b) => (b?.publishedAt?.getTime() || 0) - (a?.publishedAt?.getTime() || 0))
+    .slice(0, limit);
 }
 
 function formatUsdt(value, digits = 2) {
@@ -168,6 +297,13 @@ function getSentiment(entry) {
   const label = maybeFixText(sentiment.label_fr || sentiment.label || "N/A");
   const score = toNumber(sentiment.score);
   return { label, score };
+}
+
+function formatSentimentText(sentiment) {
+  if (!sentiment) {
+    return "-";
+  }
+  return sentiment.score === null ? sentiment.label : `${sentiment.label} (${sentiment.score.toFixed(2)})`;
 }
 
 function getSentimentTone(sentiment) {
@@ -374,24 +510,216 @@ function makeEmptyRow(tbody, colSpan, message) {
   tbody.appendChild(row);
 }
 
+function getDecisionExecutionSummary(entry, compact = false) {
+  const execution = entry?.execution || {};
+  const qty = toNumber(execution.executed_qty) || 0;
+  const notional = toNumber(execution.executed_notional_usdt) || 0;
+  const fee = toNumber(execution.fee_usdt) || 0;
+  const allocation = toNumber(execution.allocation_pct ?? entry?.decision?.allocation_pct);
+  const status =
+    maybeFixText(execution.status_fr || execution.status || execution.action_fr || execution.action) ||
+    (qty > 0 || Math.abs(notional) > 0 ? "EXECUTE" : "NON EXECUTE");
+
+  const isExecuted = qty > 0 || Math.abs(notional) > 0;
+
+  if (compact) {
+    if (isExecuted) {
+      return `${status} | ${formatUsdt(notional)}`;
+    }
+    if (getAction(entry) === "HOLD") {
+      return "Pas d'execution";
+    }
+    return `${status} | sans fill`;
+  }
+
+  const parts = [`Statut: ${status}`];
+  if (allocation !== null) {
+    parts.push(`Allocation cible: ${allocation.toFixed(1)}%`);
+  }
+
+  if (isExecuted) {
+    parts.push(`Quantite: ${formatQty(qty)}`);
+    parts.push(`Notional: ${formatUsdt(notional)}`);
+    parts.push(`Fee: ${formatUsdt(fee, 4)}`);
+  } else {
+    parts.push("Aucune execution detectee");
+  }
+
+  return parts.join(" | ");
+}
+
+function renderDecisionInspector(entry) {
+  if (!entry) {
+    setActionBadge(el.inspectActionBadge, "HOLD");
+    el.inspectTime.textContent = "-";
+    el.inspectSymbol.textContent = "-";
+    el.inspectConfidence.textContent = "-";
+    el.inspectPrice.textContent = "-";
+    el.inspectSentiment.textContent = "-";
+    el.inspectSentiment.className = "";
+    el.inspectReason.textContent = "Selectionne une decision pour voir le detail du pourquoi.";
+    el.inspectRisk.textContent = "-";
+    el.inspectExecution.textContent = "-";
+    el.inspectHeadline.textContent = "-";
+    el.inspectHeadlineLink.href = "#";
+    el.inspectHeadlineLink.classList.add("hidden");
+    el.inspectError.textContent = "";
+    el.inspectError.classList.add("hidden");
+    return;
+  }
+
+  const action = getAction(entry);
+  const sentiment = getSentiment(entry);
+  const headline = normalizeHeadline(getMostImpactfulHeadline(entry), entry?.timestamp_utc, getDecisionSymbol(entry));
+  const reason = maybeFixText(entry?.decision?.reason) || "Aucune justification disponible.";
+  const risk = maybeFixText(entry?.decision?.risk_note) || "Aucune note de risque.";
+
+  setActionBadge(el.inspectActionBadge, action);
+  el.inspectTime.textContent = formatDate(entry?.timestamp_utc, true);
+  el.inspectSymbol.textContent = getDecisionSymbol(entry);
+  el.inspectConfidence.textContent = formatConfidence(entry?.decision?.confidence);
+  el.inspectPrice.textContent = formatPrice(entry?.price);
+  el.inspectSentiment.textContent = formatSentimentText(sentiment);
+  el.inspectSentiment.className = getSentimentTone(sentiment);
+  el.inspectReason.textContent = reason;
+  el.inspectRisk.textContent = risk;
+  el.inspectExecution.textContent = getDecisionExecutionSummary(entry);
+
+  if (headline) {
+    const scoreText = headline.sentimentScore === null ? "n/a" : headline.sentimentScore.toFixed(2);
+    el.inspectHeadline.textContent = `Headline cle: ${headline.source} | ${formatDate(headline.publishedAt)} | score ${scoreText} | ${headline.title}`;
+    if (headline.link) {
+      el.inspectHeadlineLink.href = headline.link;
+      el.inspectHeadlineLink.classList.remove("hidden");
+    } else {
+      el.inspectHeadlineLink.href = "#";
+      el.inspectHeadlineLink.classList.add("hidden");
+    }
+  } else {
+    el.inspectHeadline.textContent = "Aucune headline rattachee a cette decision.";
+    el.inspectHeadlineLink.href = "#";
+    el.inspectHeadlineLink.classList.add("hidden");
+  }
+
+  const feedErrors = Array.isArray(entry?.news_sentiment?.feed_errors) ? entry.news_sentiment.feed_errors : [];
+  const geminiError = maybeFixText(entry?.gemini_error || "");
+  const feedError = maybeFixText(feedErrors[0] || "");
+  const inspectorError = geminiError || feedError;
+
+  if (inspectorError) {
+    el.inspectError.textContent = truncateText(inspectorError, 340);
+    el.inspectError.classList.remove("hidden");
+  } else {
+    el.inspectError.textContent = "";
+    el.inspectError.classList.add("hidden");
+  }
+}
+
+function renderNewsPanel(decisions) {
+  const latest = decisions.at(-1) || null;
+  const list = el.newsList;
+  list.innerHTML = "";
+
+  if (!latest) {
+    el.newsSummary.textContent = "Aucune news disponible.";
+    const li = document.createElement("li");
+    li.className = "news-item";
+    li.textContent = "Le flux news sera visible des que les decisions contiendront les headlines.";
+    list.appendChild(li);
+    return;
+  }
+
+  const sentiment = latest?.news_sentiment || {};
+  const label = maybeFixText(sentiment.label_fr || sentiment.label || "N/A");
+  const score = toNumber(sentiment.score);
+  const count = toNumber(sentiment.headline_count);
+
+  const summaryParts = [`Sentiment global: ${score === null ? label : `${label} (${score.toFixed(2)})`}`];
+  if (count !== null) {
+    summaryParts.push(`${count} headlines analysees`);
+  }
+  el.newsSummary.textContent = summaryParts.join(" | ");
+
+  const headlines = collectLatestHeadlines(decisions, 10);
+  if (!headlines.length) {
+    const li = document.createElement("li");
+    li.className = "news-item";
+    li.textContent = "Aucune headline remontee pour le moment.";
+    list.appendChild(li);
+    return;
+  }
+
+  for (const headline of headlines) {
+    const li = document.createElement("li");
+    li.className = "news-item";
+
+    const titleEl = headline.link ? document.createElement("a") : document.createElement("p");
+    titleEl.textContent = headline.title;
+    titleEl.className = headline.link ? "news-link" : "news-title";
+    if (headline.link) {
+      titleEl.href = headline.link;
+      titleEl.target = "_blank";
+      titleEl.rel = "noopener noreferrer";
+    }
+    li.appendChild(titleEl);
+
+    const scoreText = headline.sentimentScore === null ? "n/a" : headline.sentimentScore.toFixed(2);
+    const meta = document.createElement("p");
+    meta.className = "news-meta-line";
+    meta.textContent = `${headline.source} | ${formatDate(headline.publishedAt)} | score ${scoreText} | ${headline.symbol}`;
+    li.appendChild(meta);
+
+    if (headline.excerpt) {
+      const excerpt = document.createElement("p");
+      excerpt.className = "news-excerpt";
+      excerpt.textContent = truncateText(headline.excerpt, 160);
+      li.appendChild(excerpt);
+    }
+
+    list.appendChild(li);
+  }
+}
+
 function renderDecisionsTable(decisions) {
   const tbody = el.decisionsTableBody;
   tbody.innerHTML = "";
 
-  const latest = decisions.slice(-20).reverse();
+  const latest = decisions.slice(-40).reverse();
   if (!latest.length) {
-    makeEmptyRow(tbody, 6, "Aucune decision disponible.");
+    makeEmptyRow(tbody, 7, "Aucune decision disponible.");
+    renderDecisionInspector(null);
     return;
   }
 
+  const selectionStillVisible = latest.some((entry) => getDecisionId(entry) === selectedDecisionId);
+  if (!selectionStillVisible) {
+    selectedDecisionId = getDecisionId(latest[0]);
+  }
+
+  let selectedEntry = latest[0];
+
   for (const entry of latest) {
     const row = document.createElement("tr");
+    row.className = "decision-row";
+
+    const decisionId = getDecisionId(entry);
+    if (decisionId === selectedDecisionId) {
+      row.classList.add("is-selected");
+      selectedEntry = entry;
+    }
+
+    row.addEventListener("click", () => {
+      selectedDecisionId = decisionId;
+      renderDecisionsTable(decisions);
+    });
+
     const action = getAction(entry);
     const sentiment = getSentiment(entry);
-    const sentimentText = sentiment.score === null ? sentiment.label : `${sentiment.label} (${sentiment.score.toFixed(2)})`;
+    const reason = maybeFixText(entry?.decision?.reason) || "Aucune justification disponible.";
+    const sentimentText = formatSentimentText(sentiment);
 
     row.appendChild(makeCell(formatDate(entry.timestamp_utc)));
-    row.appendChild(makeCell(entry.symbol || entry?.decision?.symbol || entry?.execution?.symbol || "-"));
+    row.appendChild(makeCell(getDecisionSymbol(entry)));
 
     const actionCell = document.createElement("td");
     actionCell.appendChild(createBadge(action));
@@ -400,9 +728,12 @@ function renderDecisionsTable(decisions) {
     row.appendChild(makeCell(formatConfidence(entry?.decision?.confidence)));
     row.appendChild(makeCell(formatPrice(entry?.price)));
     row.appendChild(makeCell(sentimentText, getSentimentTone(sentiment)));
+    row.appendChild(makeCell(truncateText(reason, 120), "reason-snippet"));
 
     tbody.appendChild(row);
   }
+
+  renderDecisionInspector(selectedEntry);
 }
 
 function renderPositionsTable(positionRows) {
@@ -474,10 +805,10 @@ function renderLatestDecision(latest) {
 
   const action = getAction(latest);
   const sentiment = getSentiment(latest);
-  const sentimentText = sentiment.score === null ? sentiment.label : `${sentiment.label} (${sentiment.score.toFixed(2)})`;
+  const sentimentText = formatSentimentText(sentiment);
 
   setActionBadge(el.latestActionBadge, action);
-  el.latestSymbol.textContent = latest.symbol || latest?.decision?.symbol || latest?.execution?.symbol || "-";
+  el.latestSymbol.textContent = getDecisionSymbol(latest);
   el.latestPrice.textContent = formatPrice(latest.price);
   el.latestConfidence.textContent = formatConfidence(latest?.decision?.confidence);
   el.latestSentiment.textContent = sentimentText;
@@ -757,6 +1088,7 @@ async function loadDashboard(isRefresh = false) {
 
     renderKpis(dashboard.kpis);
     renderLatestDecision(dashboard.latest);
+    renderNewsPanel(dashboard.sorted);
     renderDecisionsTable(dashboard.sorted);
     renderPositionsTable(dashboard.positionRows);
     renderTradesTable(dashboard.trades);

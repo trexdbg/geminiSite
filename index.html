@@ -88,6 +88,38 @@
       </section>
 
       <section class="split-grid fade-in">
+        <article class="panel news-panel">
+          <div class="card-head">
+            <h2>Dernieres news marche</h2>
+            <span class="panel-note">Flux dedoublonne des dernieres analyses</span>
+          </div>
+          <p class="news-summary text-neutral" id="newsSummary">Chargement des news...</p>
+          <ul class="news-list" id="newsList"></ul>
+        </article>
+
+        <article class="panel explain-panel">
+          <div class="card-head">
+            <h2>Pourquoi ce trade ici ?</h2>
+            <span class="panel-note">Clique une ligne dans l'historique</span>
+          </div>
+          <div class="inspect-meta">
+            <p>Heure: <strong id="inspectTime">-</strong></p>
+            <p>Pair: <strong id="inspectSymbol">-</strong></p>
+            <p>Action: <span class="action-badge badge-hold" id="inspectActionBadge">ATTENTE</span></p>
+            <p>Confiance: <strong id="inspectConfidence">-</strong></p>
+            <p>Prix: <strong id="inspectPrice">-</strong></p>
+            <p>Sentiment: <strong id="inspectSentiment">-</strong></p>
+          </div>
+          <p class="decision-reason" id="inspectReason">-</p>
+          <p class="decision-risk" id="inspectRisk">-</p>
+          <p class="inspect-extra text-neutral" id="inspectExecution">-</p>
+          <p class="inspect-extra" id="inspectHeadline">-</p>
+          <a class="inspect-link hidden" id="inspectHeadlineLink" target="_blank" rel="noopener noreferrer">Ouvrir la news source</a>
+          <p class="decision-error hidden" id="inspectError"></p>
+        </article>
+      </section>
+
+      <section class="split-grid fade-in">
         <article class="panel chart-panel">
           <div class="card-head">
             <h2>Positions actuelles</h2>
@@ -98,8 +130,8 @@
 
         <article class="panel table-panel">
           <div class="card-head">
-            <h2>Dernieres decisions</h2>
-            <span class="panel-note">20 derniers signaux</span>
+            <h2>Historique des decisions</h2>
+            <span class="panel-note">40 dernieres decisions, clique pour details</span>
           </div>
           <div class="table-wrap">
             <table>
@@ -111,6 +143,7 @@
                   <th>Confiance</th>
                   <th>Prix</th>
                   <th>Sentiment</th>
+                  <th>Pourquoi ici ?</th>
                 </tr>
               </thead>
               <tbody id="decisionsTableBody"></tbody>
