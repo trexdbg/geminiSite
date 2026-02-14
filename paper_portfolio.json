@@ -1,0 +1,44 @@
+{
+  "version": 2,
+  "created_at_utc": "2026-02-14T19:40:59+00:00",
+  "initial_cash_usdt": 100.0,
+  "cash_usdt": 100.0,
+  "fees_paid_usdt": 0.0,
+  "trade_count": 0,
+  "positions": {
+    "BTCUSDT": {
+      "asset_symbol": "BTC",
+      "asset_amount": 0.0,
+      "position_cost_usdt": 0.0
+    },
+    "ETHUSDT": {
+      "asset_symbol": "ETH",
+      "asset_amount": 0.0,
+      "position_cost_usdt": 0.0
+    },
+    "SOLUSDT": {
+      "asset_symbol": "SOL",
+      "asset_amount": 0.0,
+      "position_cost_usdt": 0.0
+    },
+    "XRPUSDT": {
+      "asset_symbol": "XRP",
+      "asset_amount": 0.0,
+      "position_cost_usdt": 0.0
+    },
+    "BNBUSDT": {
+      "asset_symbol": "BNB",
+      "asset_amount": 0.0,
+      "position_cost_usdt": 0.0
+    }
+  },
+  "history": [],
+  "last_prices": {
+    "BTCUSDT": 70176.72,
+    "SOLUSDT": 88.29,
+    "ETHUSDT": 2093.6,
+    "BNBUSDT": 633.95,
+    "XRPUSDT": 1.5041
+  },
+  "last_price": 1.5041
+}
