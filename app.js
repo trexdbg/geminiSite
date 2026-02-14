@@ -38,6 +38,7 @@ const el = {
   latestPrice: document.getElementById("latestPrice"),
   latestConfidence: document.getElementById("latestConfidence"),
   latestSentiment: document.getElementById("latestSentiment"),
+  latestModel: document.getElementById("latestModel"),
   latestReason: document.getElementById("latestReason"),
   latestRisk: document.getElementById("latestRisk"),
   latestError: document.getElementById("latestError"),
@@ -49,6 +50,7 @@ const el = {
   inspectConfidence: document.getElementById("inspectConfidence"),
   inspectPrice: document.getElementById("inspectPrice"),
   inspectSentiment: document.getElementById("inspectSentiment"),
+  inspectModel: document.getElementById("inspectModel"),
   inspectReason: document.getElementById("inspectReason"),
   inspectRisk: document.getElementById("inspectRisk"),
   inspectExecution: document.getElementById("inspectExecution"),
@@ -550,6 +552,37 @@ function getDecisionModelUsed(entry) {
   );
 }
 
+function getDecisionModelSummary(entry) {
+  const modelUsed = getDecisionModelUsed(entry);
+  const attempts = Array.isArray(entry?.gemini?.attempts) ? entry.gemini.attempts : [];
+  const firstAttempt = attempts[0] && typeof attempts[0] === "object" ? attempts[0] : null;
+
+  if (!modelUsed && !firstAttempt) {
+    return "-";
+  }
+
+  const status = maybeFixText(firstAttempt?.status || "");
+  const requestsToday = toNumber(firstAttempt?.requests_today);
+  const dailyLimit = toNumber(firstAttempt?.daily_limit);
+
+  const parts = [];
+  if (modelUsed) {
+    parts.push(modelUsed);
+  }
+  if (status) {
+    parts.push(status);
+  }
+  if (requestsToday !== null && dailyLimit !== null && dailyLimit > 0) {
+    parts.push(`${requestsToday}/${dailyLimit}`);
+  }
+
+  if (parts.length) {
+    return parts.join(" | ");
+  }
+
+  return modelUsed || "-";
+}
+
 function getDecisionMarketScore(entry) {
   const symbol = getDecisionSymbol(entry);
   const marketScores = entry?.market_scores;
@@ -563,6 +596,52 @@ function getDecisionMarketScore(entry) {
 
   const first = Object.values(marketScores)[0];
   return toNumber(first);
+}
+
+function getDecisionContextParts(entry) {
+  const parts = [];
+  const strategyMode = maybeFixText(entry?.decision?.strategy_mode || "");
+  const regime = maybeFixText(entry?.decision?.regime_assessment || "");
+  const timeframe = maybeFixText(entry?.timeframe || "");
+  const score = getDecisionMarketScore(entry);
+  const symbol = getDecisionSymbol(entry);
+  const sentiment = entry?.news_sentiment || {};
+  const sentimentLabel = maybeFixText(sentiment?.label_fr || sentiment?.label || "");
+  const sentimentScore = toNumber(sentiment?.score);
+  const biasHint = maybeFixText(sentiment?.bias_hint || "");
+  const bullishCount = toNumber(sentiment?.bullish_headlines);
+  const bearishCount = toNumber(sentiment?.bearish_headlines);
+  const modelUsed = getDecisionModelUsed(entry);
+
+  if (strategyMode) {
+    parts.push(`strategie ${strategyMode}`);
+  }
+  if (regime) {
+    parts.push(`regime ${regime}`);
+  }
+  if (score !== null) {
+    parts.push(`score ${symbol}: ${score.toFixed(3)}`);
+  }
+  if (sentimentLabel || sentimentScore !== null) {
+    const sentimentText = sentimentScore === null ? sentimentLabel : `${sentimentLabel} (${sentimentScore.toFixed(3)})`;
+    parts.push(`sentiment ${sentimentText}`);
+  }
+  if (biasHint) {
+    parts.push(`biais ${biasHint}`);
+  }
+  if (bullishCount !== null || bearishCount !== null) {
+    const bullText = bullishCount === null ? "-" : String(bullishCount);
+    const bearText = bearishCount === null ? "-" : String(bearishCount);
+    parts.push(`headlines bull/bear ${bullText}/${bearText}`);
+  }
+  if (timeframe) {
+    parts.push(`timeframe ${timeframe}`);
+  }
+  if (modelUsed) {
+    parts.push(`modele ${modelUsed}`);
+  }
+
+  return parts;
 }
 
 function getDecisionReasonText(entry) {
@@ -579,35 +658,13 @@ function getDecisionReasonText(entry) {
     }
   }
 
-  const strategyMode = maybeFixText(entry?.decision?.strategy_mode || "");
-  const regime = maybeFixText(entry?.decision?.regime_assessment || "");
-  const timeframe = maybeFixText(entry?.timeframe || "");
-  const modelUsed = getDecisionModelUsed(entry);
-  const score = getDecisionMarketScore(entry);
-  const symbol = getDecisionSymbol(entry);
-
-  const context = [];
-  if (strategyMode && strategyMode !== "NONE") {
-    context.push(`Mode strategie: ${strategyMode}`);
-  }
-  if (regime && regime !== "UNKNOWN") {
-    context.push(`Regime: ${regime}`);
-  }
-  if (score !== null) {
-    context.push(`Score marche ${symbol}: ${score.toFixed(3)}`);
-  }
-  if (timeframe) {
-    context.push(`Timeframe: ${timeframe}`);
-  }
-  if (modelUsed) {
-    context.push(`Modele: ${modelUsed}`);
-  }
+  const context = getDecisionContextParts(entry);
 
   if (context.length) {
-    return `Justification non fournie par le moteur. ${context.join(" | ")}`;
+    return `Raison absente dans la sortie du dernier modele. Contexte: ${context.join(" | ")}`;
   }
 
-  return "Justification non fournie par le moteur.";
+  return "Raison absente dans la sortie du dernier modele.";
 }
 
 function getDecisionRiskText(entry) {
@@ -636,22 +693,13 @@ function getDecisionRiskText(entry) {
     return `Risque non evalue (erreur flux news): ${truncateText(feedError, 180)}`;
   }
 
-  const strategyMode = maybeFixText(entry?.decision?.strategy_mode || "");
-  const regime = maybeFixText(entry?.decision?.regime_assessment || "");
-  const context = [];
-
-  if (strategyMode && strategyMode !== "NONE") {
-    context.push(`Mode strategie: ${strategyMode}`);
-  }
-  if (regime && regime !== "UNKNOWN") {
-    context.push(`Regime: ${regime}`);
-  }
+  const context = getDecisionContextParts(entry);
 
   if (context.length) {
-    return `Note de risque non fournie. ${context.join(" | ")}`;
+    return `Risque non fourni par le dernier modele. Contexte: ${context.join(" | ")}`;
   }
 
-  return "Note de risque non fournie par le moteur.";
+  return "Risque non fourni par le dernier modele.";
 }
 
 function setMainView(viewName) {
@@ -821,6 +869,7 @@ function renderDecisionInspector(entry) {
     el.inspectConfidence.textContent = "-";
     el.inspectPrice.textContent = "-";
     el.inspectSentiment.textContent = "-";
+    el.inspectModel.textContent = "-";
     el.inspectSentiment.className = "";
     el.inspectReason.textContent = "Selectionne une decision pour voir le detail du pourquoi.";
     el.inspectRisk.textContent = "-";
@@ -845,6 +894,7 @@ function renderDecisionInspector(entry) {
   el.inspectConfidence.textContent = formatConfidence(entry?.decision?.confidence);
   el.inspectPrice.textContent = formatPrice(entry?.price);
   el.inspectSentiment.textContent = formatSentimentText(sentiment);
+  el.inspectModel.textContent = getDecisionModelSummary(entry);
   el.inspectSentiment.className = getSentimentTone(sentiment);
   el.inspectReason.textContent = reason;
   el.inspectRisk.textContent = risk;
@@ -1068,6 +1118,7 @@ function renderLatestDecision(latest) {
     el.latestPrice.textContent = "-";
     el.latestConfidence.textContent = "-";
     el.latestSentiment.textContent = "-";
+    el.latestModel.textContent = "-";
     el.latestReason.textContent = "Aucune donnee.";
     el.latestRisk.textContent = "-";
     el.latestError.textContent = "";
@@ -1084,6 +1135,7 @@ function renderLatestDecision(latest) {
   el.latestPrice.textContent = formatPrice(latest.price);
   el.latestConfidence.textContent = formatConfidence(latest?.decision?.confidence);
   el.latestSentiment.textContent = sentimentText;
+  el.latestModel.textContent = getDecisionModelSummary(latest);
   el.latestSentiment.className = getSentimentTone(sentiment);
 
   const reason = getDecisionReasonText(latest);
