@@ -8,7 +8,7 @@
       name="description"
       content="Dashboard GitHub Pages pour suivre les decisions crypto et le portefeuille papier."
     />
-    <link rel="stylesheet" href="./styles.css?v=20260214-5" />
+    <link rel="stylesheet" href="./styles.css?v=20260214-6" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -107,7 +107,15 @@
           <article class="panel chart-panel">
             <div class="card-head">
               <h2>Suivi portefeuille</h2>
-              <span class="panel-note">Valeur + points BUY / SELL / HOLD</span>
+              <div class="chart-head-meta">
+                <span class="panel-note">Valeur + points BUY / SELL / HOLD</span>
+                <div class="range-switch" role="group" aria-label="Timeframe suivi portefeuille">
+                  <button type="button" class="range-btn" data-value-range="1d" aria-pressed="false">1 jour</button>
+                  <button type="button" class="range-btn" data-value-range="1w" aria-pressed="false">1 semaine</button>
+                  <button type="button" class="range-btn is-active" data-value-range="1m" aria-pressed="true">1 mois</button>
+                  <button type="button" class="range-btn" data-value-range="1y" aria-pressed="false">1 an</button>
+                </div>
+              </div>
             </div>
             <canvas id="valueChart" aria-label="Courbe de valeur du portefeuille"></canvas>
           </article>
@@ -132,7 +140,7 @@
           </article>
         </section>
 
-        <section class="single-grid fade-in">
+        <section class="split-grid fade-in">
           <article class="panel table-panel">
             <div class="card-head">
               <h2>Portefeuille actuel</h2>
@@ -151,6 +159,28 @@
                   </tr>
                 </thead>
                 <tbody id="positionsTableBody"></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel table-panel">
+            <div class="card-head">
+              <h2>Historique des trades</h2>
+              <span class="panel-note">Executions detectees</span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Heure</th>
+                    <th>Pair</th>
+                    <th>Action</th>
+                    <th>Quantite</th>
+                    <th>Notional</th>
+                    <th>Fee</th>
+                  </tr>
+                </thead>
+                <tbody id="tradesTableBody"></tbody>
               </table>
             </div>
           </article>
@@ -184,74 +214,29 @@
 
           <article class="panel insights-panel">
             <div class="card-head">
-              <h2>Detail des decisions</h2>
-              <span class="panel-note">Pourquoi + historique des executions</span>
+              <h2>Pourquoi ce trade ici ?</h2>
+              <span class="panel-note">Clique une ligne dans l'historique</span>
             </div>
-            <div class="tab-switch" role="tablist" aria-label="Onglets detail decisions">
-              <button
-                type="button"
-                class="tab-btn is-active"
-                id="tabBtnInspect"
-                role="tab"
-                aria-selected="true"
-                aria-controls="tabPanelInspect"
-                data-tab-target="inspect"
-              >
-                Pourquoi ce trade ici ?
-              </button>
-              <button
-                type="button"
-                class="tab-btn"
-                id="tabBtnTrades"
-                role="tab"
-                aria-selected="false"
-                aria-controls="tabPanelTrades"
-                data-tab-target="trades"
-              >
-                Historique des trades
-              </button>
+            <div class="inspect-meta">
+              <p>Heure: <strong id="inspectTime">-</strong></p>
+              <p>Pair: <strong id="inspectSymbol">-</strong></p>
+              <p>Action: <span class="action-badge badge-hold" id="inspectActionBadge">ATTENTE</span></p>
+              <p>Confiance: <strong id="inspectConfidence">-</strong></p>
+              <p>Prix: <strong id="inspectPrice">-</strong></p>
+              <p>Sentiment: <strong id="inspectSentiment">-</strong></p>
             </div>
-
-            <div class="tab-panel is-active" id="tabPanelInspect" role="tabpanel" aria-labelledby="tabBtnInspect">
-              <div class="inspect-meta">
-                <p>Heure: <strong id="inspectTime">-</strong></p>
-                <p>Pair: <strong id="inspectSymbol">-</strong></p>
-                <p>Action: <span class="action-badge badge-hold" id="inspectActionBadge">ATTENTE</span></p>
-                <p>Confiance: <strong id="inspectConfidence">-</strong></p>
-                <p>Prix: <strong id="inspectPrice">-</strong></p>
-                <p>Sentiment: <strong id="inspectSentiment">-</strong></p>
-              </div>
-              <p class="decision-reason" id="inspectReason">-</p>
-              <p class="decision-risk" id="inspectRisk">-</p>
-              <p class="inspect-extra text-neutral" id="inspectExecution">-</p>
-              <p class="inspect-extra" id="inspectHeadline">-</p>
-              <a class="inspect-link hidden" id="inspectHeadlineLink" target="_blank" rel="noopener noreferrer">Ouvrir la news source</a>
-              <p class="decision-error hidden" id="inspectError"></p>
-            </div>
-
-            <div class="tab-panel hidden" id="tabPanelTrades" role="tabpanel" aria-labelledby="tabBtnTrades">
-              <div class="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Heure</th>
-                      <th>Pair</th>
-                      <th>Action</th>
-                      <th>Quantite</th>
-                      <th>Notional</th>
-                      <th>Fee</th>
-                    </tr>
-                  </thead>
-                  <tbody id="tradesTableBody"></tbody>
-                </table>
-              </div>
-            </div>
+            <p class="decision-reason" id="inspectReason">-</p>
+            <p class="decision-risk" id="inspectRisk">-</p>
+            <p class="inspect-extra text-neutral" id="inspectExecution">-</p>
+            <p class="inspect-extra" id="inspectHeadline">-</p>
+            <a class="inspect-link hidden" id="inspectHeadlineLink" target="_blank" rel="noopener noreferrer">Ouvrir la news source</a>
+            <p class="decision-error hidden" id="inspectError"></p>
           </article>
         </section>
       </section>
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-    <script src="./app.js?v=20260214-5" type="module"></script>
+    <script src="./app.js?v=20260214-6" type="module"></script>
   </body>
 </html>

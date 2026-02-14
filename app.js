@@ -9,12 +9,19 @@ const ACTION_STYLE = {
 };
 
 const palette = ["#3ad0ff", "#12c48b", "#f6a928", "#ff6262", "#8cc3ff", "#ff9f6f"];
+const VALUE_RANGE_DAYS = {
+  "1d": 1,
+  "1w": 7,
+  "1m": 30,
+  "1y": 365
+};
 
 let valueChart = null;
 let exposureChart = null;
 let selectedDecisionId = null;
-let activeInsightTab = "inspect";
 let activeMainView = "dashboard";
+let activeValueRange = "1m";
+let latestValueSeries = [];
 
 const el = {
   statusMessage: document.getElementById("statusMessage"),
@@ -52,10 +59,7 @@ const el = {
   viewBtnHistory: document.getElementById("viewBtnHistory"),
   viewPanelDashboard: document.getElementById("viewPanelDashboard"),
   viewPanelHistory: document.getElementById("viewPanelHistory"),
-  tabBtnInspect: document.getElementById("tabBtnInspect"),
-  tabBtnTrades: document.getElementById("tabBtnTrades"),
-  tabPanelInspect: document.getElementById("tabPanelInspect"),
-  tabPanelTrades: document.getElementById("tabPanelTrades"),
+  valueRangeButtons: Array.from(document.querySelectorAll("[data-value-range]")),
   decisionsTableBody: document.getElementById("decisionsTableBody"),
   positionsTableBody: document.getElementById("positionsTableBody"),
   tradesTableBody: document.getElementById("tradesTableBody"),
@@ -555,39 +559,72 @@ function initMainViewSwitch() {
   setMainView(activeMainView);
 }
 
-function setInsightTab(tabName) {
-  const isInspect = tabName !== "trades";
-  activeInsightTab = isInspect ? "inspect" : "trades";
-
-  if (!el.tabBtnInspect || !el.tabBtnTrades || !el.tabPanelInspect || !el.tabPanelTrades) {
-    return;
+function applyValueRangeButtonState() {
+  for (const button of el.valueRangeButtons) {
+    const range = button.dataset.valueRange;
+    const isActive = range === activeValueRange;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-pressed", String(isActive));
   }
-
-  el.tabBtnInspect.classList.toggle("is-active", isInspect);
-  el.tabBtnTrades.classList.toggle("is-active", !isInspect);
-  el.tabBtnInspect.setAttribute("aria-selected", String(isInspect));
-  el.tabBtnTrades.setAttribute("aria-selected", String(!isInspect));
-
-  el.tabPanelInspect.classList.toggle("hidden", !isInspect);
-  el.tabPanelTrades.classList.toggle("hidden", isInspect);
-  el.tabPanelInspect.classList.toggle("is-active", isInspect);
-  el.tabPanelTrades.classList.toggle("is-active", !isInspect);
 }
 
-function initInsightTabs() {
-  if (!el.tabBtnInspect || !el.tabBtnTrades) {
+function filterSeriesByRange(series, rangeKey) {
+  if (!Array.isArray(series) || !series.length) {
+    return [];
+  }
+
+  const days = VALUE_RANGE_DAYS[rangeKey];
+  if (!days) {
+    return series;
+  }
+
+  const lastDate = series.at(-1)?.date instanceof Date ? series.at(-1).date : parseDate(series.at(-1)?.date);
+  if (!lastDate) {
+    return series;
+  }
+
+  const cutoffMs = lastDate.getTime() - days * 24 * 60 * 60 * 1000;
+  const firstIndex = series.findIndex((point) => point?.date instanceof Date && point.date.getTime() >= cutoffMs);
+
+  if (firstIndex <= 0) {
+    return series;
+  }
+
+  const ranged = series.slice(firstIndex);
+  return [series[firstIndex - 1], ...ranged];
+}
+
+function renderValueChartByRange(series) {
+  const filtered = filterSeriesByRange(series, activeValueRange);
+  renderValueChart(filtered.length ? filtered : series);
+}
+
+function setValueRange(rangeKey) {
+  if (!VALUE_RANGE_DAYS[rangeKey]) {
     return;
   }
 
-  el.tabBtnInspect.addEventListener("click", () => {
-    setInsightTab("inspect");
-  });
+  activeValueRange = rangeKey;
+  applyValueRangeButtonState();
 
-  el.tabBtnTrades.addEventListener("click", () => {
-    setInsightTab("trades");
-  });
+  if (latestValueSeries.length) {
+    renderValueChartByRange(latestValueSeries);
+  }
+}
 
-  setInsightTab(activeInsightTab);
+function initValueRangeSwitch() {
+  if (!el.valueRangeButtons.length) {
+    return;
+  }
+
+  for (const button of el.valueRangeButtons) {
+    button.addEventListener("click", () => {
+      const range = button.dataset.valueRange;
+      setValueRange(range);
+    });
+  }
+
+  applyValueRangeButtonState();
 }
 
 function getDecisionExecutionSummary(entry, compact = false) {
@@ -812,7 +849,6 @@ function renderDecisionsTable(decisions) {
 
     row.addEventListener("click", () => {
       selectedDecisionId = decisionId;
-      setInsightTab("inspect");
       renderDecisionsTable(decisions);
     });
 
@@ -1198,7 +1234,8 @@ async function loadDashboard(isRefresh = false) {
     renderDecisionsTable(dashboard.sorted);
     renderPositionsTable(dashboard.positionRows);
     renderTradesTable(dashboard.trades);
-    renderValueChart(dashboard.series);
+    latestValueSeries = dashboard.series;
+    renderValueChartByRange(dashboard.series);
     renderExposureChart(dashboard.positionRows, dashboard.kpis.cash);
 
     setStatus(`OK - ${dashboard.sorted.length} decisions chargees.`);
@@ -1216,7 +1253,7 @@ function boot() {
   }
 
   initMainViewSwitch();
-  initInsightTabs();
+  initValueRangeSwitch();
   loadDashboard();
   window.setInterval(() => loadDashboard(true), REFRESH_INTERVAL_MS);
 }
