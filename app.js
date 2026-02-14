@@ -536,10 +536,6 @@ function isMissingReasonText(text) {
     return true;
   }
 
-  if (clean.includes("aucune raison fournie") || clean.includes("no reason provided")) {
-    return true;
-  }
-
   return false;
 }
 
@@ -554,32 +550,6 @@ function getDecisionModelUsed(entry) {
 
 function getDecisionModelSummary(entry) {
   const modelUsed = getDecisionModelUsed(entry);
-  const attempts = Array.isArray(entry?.gemini?.attempts) ? entry.gemini.attempts : [];
-  const firstAttempt = attempts[0] && typeof attempts[0] === "object" ? attempts[0] : null;
-
-  if (!modelUsed && !firstAttempt) {
-    return "-";
-  }
-
-  const status = maybeFixText(firstAttempt?.status || "");
-  const requestsToday = toNumber(firstAttempt?.requests_today);
-  const dailyLimit = toNumber(firstAttempt?.daily_limit);
-
-  const parts = [];
-  if (modelUsed) {
-    parts.push(modelUsed);
-  }
-  if (status) {
-    parts.push(status);
-  }
-  if (requestsToday !== null && dailyLimit !== null && dailyLimit > 0) {
-    parts.push(`${requestsToday}/${dailyLimit}`);
-  }
-
-  if (parts.length) {
-    return parts.join(" | ");
-  }
-
   return modelUsed || "-";
 }
 
@@ -658,13 +628,7 @@ function getDecisionReasonText(entry) {
     }
   }
 
-  const context = getDecisionContextParts(entry);
-
-  if (context.length) {
-    return `Raison absente dans la sortie du dernier modele. Contexte: ${context.join(" | ")}`;
-  }
-
-  return "Raison absente dans la sortie du dernier modele.";
+  return "Aucune raison fournie par le modele.";
 }
 
 function getDecisionRiskText(entry) {
@@ -693,13 +657,7 @@ function getDecisionRiskText(entry) {
     return `Risque non evalue (erreur flux news): ${truncateText(feedError, 180)}`;
   }
 
-  const context = getDecisionContextParts(entry);
-
-  if (context.length) {
-    return `Risque non fourni par le dernier modele. Contexte: ${context.join(" | ")}`;
-  }
-
-  return "Risque non fourni par le dernier modele.";
+  return "Aucune note de risque fournie.";
 }
 
 function setMainView(viewName) {
