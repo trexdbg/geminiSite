@@ -549,6 +549,24 @@ function getDecisionExecutionSummary(entry, compact = false) {
 }
 
 function renderDecisionInspector(entry) {
+  const inspectorReady =
+    el.inspectActionBadge &&
+    el.inspectTime &&
+    el.inspectSymbol &&
+    el.inspectConfidence &&
+    el.inspectPrice &&
+    el.inspectSentiment &&
+    el.inspectReason &&
+    el.inspectRisk &&
+    el.inspectExecution &&
+    el.inspectHeadline &&
+    el.inspectHeadlineLink &&
+    el.inspectError;
+
+  if (!inspectorReady) {
+    return;
+  }
+
   if (!entry) {
     setActionBadge(el.inspectActionBadge, "HOLD");
     el.inspectTime.textContent = "-";
@@ -616,6 +634,10 @@ function renderDecisionInspector(entry) {
 }
 
 function renderNewsPanel(decisions) {
+  if (!el.newsSummary || !el.newsList) {
+    return;
+  }
+
   const latest = decisions.at(-1) || null;
   const list = el.newsList;
   list.innerHTML = "";
