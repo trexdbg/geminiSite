@@ -1,0 +1,172 @@
+﻿<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>GeminiSite - Crypto Decision Dashboard</title>
+    <meta
+      name="description"
+      content="Dashboard GitHub Pages pour suivre les decisions crypto et le portefeuille papier."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <div class="backdrop" aria-hidden="true">
+      <div class="orb orb-cyan"></div>
+      <div class="orb orb-amber"></div>
+      <div class="grid-noise"></div>
+    </div>
+
+    <main class="layout">
+      <header class="hero panel fade-in">
+        <div>
+          <p class="eyebrow">Gemini Actions Stream</p>
+          <h1>Crypto Trade Monitor</h1>
+          <p class="hero-sub">
+            Lecture des dernieres decisions IA, suivi du portefeuille et timeline des trades.
+          </p>
+        </div>
+        <div class="hero-meta">
+          <p id="statusMessage">Chargement des donnees...</p>
+          <p>Derniere maj: <strong id="updatedAt">-</strong></p>
+        </div>
+      </header>
+
+      <section class="kpi-grid fade-in" aria-label="Indicateurs portefeuille">
+        <article class="panel kpi">
+          <span class="kpi-label">Valeur totale</span>
+          <strong class="kpi-value" id="kpiTotalValue">-</strong>
+          <span class="kpi-sub" id="kpiTotalPnl">-</span>
+        </article>
+        <article class="panel kpi">
+          <span class="kpi-label">Cash USDT</span>
+          <strong class="kpi-value" id="kpiCash">-</strong>
+          <span class="kpi-sub">Liquidite disponible</span>
+        </article>
+        <article class="panel kpi">
+          <span class="kpi-label">Trades executes</span>
+          <strong class="kpi-value" id="kpiTrades">-</strong>
+          <span class="kpi-sub" id="kpiFees">-</span>
+        </article>
+        <article class="panel kpi">
+          <span class="kpi-label">Positions ouvertes</span>
+          <strong class="kpi-value" id="kpiOpenPositions">-</strong>
+          <span class="kpi-sub" id="kpiExposure">-</span>
+        </article>
+      </section>
+
+      <section class="decision-grid fade-in">
+        <article class="panel latest-decision">
+          <div class="card-head">
+            <h2>Derniere decision</h2>
+            <span class="action-badge badge-hold" id="latestActionBadge">ATTENTE</span>
+          </div>
+          <div class="latest-meta">
+            <p>Pair: <strong id="latestSymbol">-</strong></p>
+            <p>Prix: <strong id="latestPrice">-</strong></p>
+            <p>Confiance: <strong id="latestConfidence">-</strong></p>
+            <p>Sentiment: <strong id="latestSentiment">-</strong></p>
+          </div>
+          <p class="decision-reason" id="latestReason">-</p>
+          <p class="decision-risk" id="latestRisk">-</p>
+          <p class="decision-error hidden" id="latestError"></p>
+        </article>
+
+        <article class="panel chart-panel">
+          <div class="card-head">
+            <h2>Suivi portefeuille</h2>
+            <span class="panel-note">Valeur + points BUY / SELL / HOLD</span>
+          </div>
+          <canvas id="valueChart" aria-label="Courbe de valeur du portefeuille"></canvas>
+        </article>
+      </section>
+
+      <section class="split-grid fade-in">
+        <article class="panel chart-panel">
+          <div class="card-head">
+            <h2>Positions actuelles</h2>
+            <span class="panel-note">Repartition des actifs ouverts</span>
+          </div>
+          <canvas id="exposureChart" aria-label="Repartition des positions"></canvas>
+        </article>
+
+        <article class="panel table-panel">
+          <div class="card-head">
+            <h2>Dernieres decisions</h2>
+            <span class="panel-note">20 derniers signaux</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Heure</th>
+                  <th>Pair</th>
+                  <th>Action</th>
+                  <th>Confiance</th>
+                  <th>Prix</th>
+                  <th>Sentiment</th>
+                </tr>
+              </thead>
+              <tbody id="decisionsTableBody"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="split-grid fade-in">
+        <article class="panel table-panel">
+          <div class="card-head">
+            <h2>Portefeuille actuel</h2>
+            <span class="panel-note">PnL marque-to-market</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Actif</th>
+                  <th>Quantite</th>
+                  <th>Prix spot</th>
+                  <th>Valeur</th>
+                  <th>Cout</th>
+                  <th>PnL</th>
+                </tr>
+              </thead>
+              <tbody id="positionsTableBody"></tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel table-panel">
+          <div class="card-head">
+            <h2>Prises de trade</h2>
+            <span class="panel-note">Executions detectees</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Heure</th>
+                  <th>Pair</th>
+                  <th>Action</th>
+                  <th>Quantite</th>
+                  <th>Notional</th>
+                  <th>Fee</th>
+                </tr>
+              </thead>
+              <tbody id="tradesTableBody"></tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <script src="./app.js" type="module"></script>
+  </body>
+</html>
