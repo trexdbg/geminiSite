@@ -524,6 +524,136 @@ function makeEmptyRow(tbody, colSpan, message) {
   tbody.appendChild(row);
 }
 
+function isMissingReasonText(text) {
+  const clean = maybeFixText(text).toLowerCase();
+  if (!clean) {
+    return true;
+  }
+
+  if (clean === "-" || clean === "n/a") {
+    return true;
+  }
+
+  if (clean.includes("aucune raison fournie") || clean.includes("no reason provided")) {
+    return true;
+  }
+
+  return false;
+}
+
+function getDecisionModelUsed(entry) {
+  return maybeFixText(
+    entry?.gemini?.model_used ||
+    entry?.gemini?.model ||
+    entry?.gemini_model ||
+    ""
+  );
+}
+
+function getDecisionMarketScore(entry) {
+  const symbol = getDecisionSymbol(entry);
+  const marketScores = entry?.market_scores;
+  if (!marketScores || typeof marketScores !== "object") {
+    return null;
+  }
+
+  if (symbol && marketScores[symbol] !== undefined) {
+    return toNumber(marketScores[symbol]);
+  }
+
+  const first = Object.values(marketScores)[0];
+  return toNumber(first);
+}
+
+function getDecisionReasonText(entry) {
+  const reasonCandidates = [
+    entry?.decision?.reason_fr,
+    entry?.decision?.reason,
+    entry?.decision?.rationale,
+    entry?.decision?.explanation
+  ];
+
+  for (const candidate of reasonCandidates) {
+    if (!isMissingReasonText(candidate)) {
+      return maybeFixText(candidate);
+    }
+  }
+
+  const strategyMode = maybeFixText(entry?.decision?.strategy_mode || "");
+  const regime = maybeFixText(entry?.decision?.regime_assessment || "");
+  const timeframe = maybeFixText(entry?.timeframe || "");
+  const modelUsed = getDecisionModelUsed(entry);
+  const score = getDecisionMarketScore(entry);
+  const symbol = getDecisionSymbol(entry);
+
+  const context = [];
+  if (strategyMode && strategyMode !== "NONE") {
+    context.push(`Mode strategie: ${strategyMode}`);
+  }
+  if (regime && regime !== "UNKNOWN") {
+    context.push(`Regime: ${regime}`);
+  }
+  if (score !== null) {
+    context.push(`Score marche ${symbol}: ${score.toFixed(3)}`);
+  }
+  if (timeframe) {
+    context.push(`Timeframe: ${timeframe}`);
+  }
+  if (modelUsed) {
+    context.push(`Modele: ${modelUsed}`);
+  }
+
+  if (context.length) {
+    return `Justification non fournie par le moteur. ${context.join(" | ")}`;
+  }
+
+  return "Justification non fournie par le moteur.";
+}
+
+function getDecisionRiskText(entry) {
+  const riskCandidates = [
+    entry?.decision?.risk_note_fr,
+    entry?.decision?.risk_note,
+    entry?.decision?.risk,
+    entry?.decision?.risk_comment
+  ];
+
+  for (const candidate of riskCandidates) {
+    const clean = maybeFixText(candidate);
+    if (clean) {
+      return clean;
+    }
+  }
+
+  const geminiError = maybeFixText(entry?.gemini_error || "");
+  if (geminiError) {
+    return `Risque non evalue (erreur modele): ${truncateText(geminiError, 180)}`;
+  }
+
+  const feedErrors = Array.isArray(entry?.news_sentiment?.feed_errors) ? entry.news_sentiment.feed_errors : [];
+  const feedError = maybeFixText(feedErrors[0] || "");
+  if (feedError) {
+    return `Risque non evalue (erreur flux news): ${truncateText(feedError, 180)}`;
+  }
+
+  const strategyMode = maybeFixText(entry?.decision?.strategy_mode || "");
+  const regime = maybeFixText(entry?.decision?.regime_assessment || "");
+  const context = [];
+
+  if (strategyMode && strategyMode !== "NONE") {
+    context.push(`Mode strategie: ${strategyMode}`);
+  }
+  if (regime && regime !== "UNKNOWN") {
+    context.push(`Regime: ${regime}`);
+  }
+
+  if (context.length) {
+    return `Note de risque non fournie. ${context.join(" | ")}`;
+  }
+
+  return "Note de risque non fournie par le moteur.";
+}
+
 function setMainView(viewName) {
   const showDashboard = viewName !== "history";
   activeMainView = showDashboard ? "dashboard" : "history";
@@ -706,8 +836,8 @@ function renderDecisionInspector(entry) {
   const action = getAction(entry);
   const sentiment = getSentiment(entry);
   const headline = normalizeHeadline(getMostImpactfulHeadline(entry), entry?.timestamp_utc, getDecisionSymbol(entry));
-  const reason = maybeFixText(entry?.decision?.reason) || "Aucune justification disponible.";
-  const risk = maybeFixText(entry?.decision?.risk_note) || "Aucune note de risque.";
+  const reason = getDecisionReasonText(entry);
+  const risk = getDecisionRiskText(entry);
 
   setActionBadge(el.inspectActionBadge, action);
   el.inspectTime.textContent = formatDate(entry?.timestamp_utc, true);
@@ -854,7 +984,7 @@ function renderDecisionsTable(decisions) {
 
     const action = getAction(entry);
     const sentiment = getSentiment(entry);
-    const reason = maybeFixText(entry?.decision?.reason) || "Aucune justification disponible.";
+    const reason = getDecisionReasonText(entry);
     const sentimentText = formatSentimentText(sentiment);
 
     row.appendChild(makeCell(formatDate(entry.timestamp_utc)));
@@ -956,8 +1086,8 @@ function renderLatestDecision(latest) {
   el.latestSentiment.textContent = sentimentText;
   el.latestSentiment.className = getSentimentTone(sentiment);
 
-  const reason = maybeFixText(latest?.decision?.reason) || "Aucune justification disponible.";
-  const risk = maybeFixText(latest?.decision?.risk_note) || "Aucune note de risque.";
+  const reason = getDecisionReasonText(latest);
+  const risk = getDecisionRiskText(latest);
   const error = maybeFixText(latest?.gemini_error || "");
 
   el.latestReason.textContent = reason;
