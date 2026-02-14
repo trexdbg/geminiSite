@@ -202,9 +202,63 @@ h2 {
 }
 
 .news-panel,
-.explain-panel {
+.insights-panel {
   display: grid;
   gap: 0.7rem;
+}
+
+.insights-panel {
+  align-content: start;
+}
+
+.tab-switch {
+  display: inline-flex;
+  gap: 0.45rem;
+  padding: 0.25rem;
+  border-radius: 12px;
+  background: rgba(14, 34, 48, 0.74);
+  border: 1px solid rgba(130, 175, 196, 0.24);
+}
+
+.tab-btn {
+  appearance: none;
+  border: 1px solid rgba(122, 165, 186, 0.35);
+  background: rgba(16, 40, 56, 0.6);
+  color: #b8d5e4;
+  border-radius: 10px;
+  padding: 0.45rem 0.72rem;
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.tab-btn:hover {
+  color: #e6f2f9;
+  border-color: rgba(155, 205, 231, 0.45);
+}
+
+.tab-btn.is-active {
+  color: #032439;
+  background: linear-gradient(130deg, #8ce8ff 0%, #7fc2ff 100%);
+  border-color: rgba(142, 222, 255, 0.86);
+  box-shadow: 0 4px 14px rgba(58, 168, 218, 0.26);
+}
+
+.tab-btn:focus-visible {
+  outline: 2px solid rgba(140, 232, 255, 0.45);
+  outline-offset: 2px;
+}
+
+.tab-panel {
+  display: grid;
+  gap: 0.7rem;
+  min-height: 0;
+}
+
+.tab-panel .table-wrap {
+  margin-top: 0;
 }
 
 .news-summary {
@@ -380,7 +434,13 @@ h2 {
 .split-grid {
   display: grid;
   gap: 1rem;
+  align-items: start;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.single-grid {
+  display: grid;
+  gap: 1rem;
 }
 
 .table-panel {
@@ -397,7 +457,7 @@ h2 {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 660px;
+  min-width: 620px;
 }
 
 th,
@@ -487,6 +547,22 @@ tbody tr:hover {
   .hero-meta {
     text-align: left;
   }
+
+  table {
+    min-width: 560px;
+  }
+}
+
+@media (max-width: 860px) {
+  .card-head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .panel-note {
+    font-size: 0.78rem;
+  }
 }
 
 @media (max-width: 640px) {
@@ -503,10 +579,24 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
+  .tab-switch {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .tab-btn {
+    width: 100%;
+    text-align: left;
+  }
+
   th,
   td {
     padding: 0.5rem 0.45rem;
     font-size: 0.76rem;
+  }
+
+  table {
+    min-width: 480px;
   }
 
   .inspect-meta {

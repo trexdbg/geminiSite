@@ -13,6 +13,7 @@ const palette = ["#3ad0ff", "#12c48b", "#f6a928", "#ff6262", "#8cc3ff", "#ff9f6f
 let valueChart = null;
 let exposureChart = null;
 let selectedDecisionId = null;
+let activeInsightTab = "inspect";
 
 const el = {
   statusMessage: document.getElementById("statusMessage"),
@@ -46,6 +47,10 @@ const el = {
   inspectHeadline: document.getElementById("inspectHeadline"),
   inspectHeadlineLink: document.getElementById("inspectHeadlineLink"),
   inspectError: document.getElementById("inspectError"),
+  tabBtnInspect: document.getElementById("tabBtnInspect"),
+  tabBtnTrades: document.getElementById("tabBtnTrades"),
+  tabPanelInspect: document.getElementById("tabPanelInspect"),
+  tabPanelTrades: document.getElementById("tabPanelTrades"),
   decisionsTableBody: document.getElementById("decisionsTableBody"),
   positionsTableBody: document.getElementById("positionsTableBody"),
   tradesTableBody: document.getElementById("tradesTableBody"),
@@ -510,6 +515,41 @@ function makeEmptyRow(tbody, colSpan, message) {
   tbody.appendChild(row);
 }
 
+function setInsightTab(tabName) {
+  const isInspect = tabName !== "trades";
+  activeInsightTab = isInspect ? "inspect" : "trades";
+
+  if (!el.tabBtnInspect || !el.tabBtnTrades || !el.tabPanelInspect || !el.tabPanelTrades) {
+    return;
+  }
+
+  el.tabBtnInspect.classList.toggle("is-active", isInspect);
+  el.tabBtnTrades.classList.toggle("is-active", !isInspect);
+  el.tabBtnInspect.setAttribute("aria-selected", String(isInspect));
+  el.tabBtnTrades.setAttribute("aria-selected", String(!isInspect));
+
+  el.tabPanelInspect.classList.toggle("hidden", !isInspect);
+  el.tabPanelTrades.classList.toggle("hidden", isInspect);
+  el.tabPanelInspect.classList.toggle("is-active", isInspect);
+  el.tabPanelTrades.classList.toggle("is-active", !isInspect);
+}
+
+function initInsightTabs() {
+  if (!el.tabBtnInspect || !el.tabBtnTrades) {
+    return;
+  }
+
+  el.tabBtnInspect.addEventListener("click", () => {
+    setInsightTab("inspect");
+  });
+
+  el.tabBtnTrades.addEventListener("click", () => {
+    setInsightTab("trades");
+  });
+
+  setInsightTab(activeInsightTab);
+}
+
 function getDecisionExecutionSummary(entry, compact = false) {
   const execution = entry?.execution || {};
   const qty = toNumber(execution.executed_qty) || 0;
@@ -732,6 +772,7 @@ function renderDecisionsTable(decisions) {
 
     row.addEventListener("click", () => {
       selectedDecisionId = decisionId;
+      setInsightTab("inspect");
       renderDecisionsTable(decisions);
     });
 
@@ -786,6 +827,9 @@ function renderPositionsTable(positionRows) {
 
 function renderTradesTable(trades) {
   const tbody = el.tradesTableBody;
+  if (!tbody) {
+    return;
+  }
   tbody.innerHTML = "";
 
   if (!trades.length) {
@@ -1131,6 +1175,7 @@ function boot() {
     Chart.defaults.color = "#d9e8f1";
   }
 
+  initInsightTabs();
   loadDashboard();
   window.setInterval(() => loadDashboard(true), REFRESH_INTERVAL_MS);
 }
