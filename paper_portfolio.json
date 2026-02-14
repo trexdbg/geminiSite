@@ -34,11 +34,11 @@
   },
   "history": [],
   "last_prices": {
-    "BTCUSDT": 69766.26,
-    "ETHUSDT": 2084.25,
-    "SOLUSDT": 88.36,
-    "XRPUSDT": 1.5033,
-    "BNBUSDT": 633.97
+    "BTCUSDT": 69835.23,
+    "ETHUSDT": 2089.54,
+    "SOLUSDT": 88.53,
+    "XRPUSDT": 1.5062,
+    "BNBUSDT": 632.25
   },
   "gemini_usage": {
     "date_utc": "2026-02-14",
@@ -63,5 +63,5 @@
       }
     }
   },
-  "last_price": 633.97
+  "last_price": 69835.23
 }
