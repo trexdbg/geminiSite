@@ -34,34 +34,34 @@
   },
   "history": [],
   "last_prices": {
-    "BTCUSDT": 69998.49,
-    "ETHUSDT": 2090.45,
-    "SOLUSDT": 88.78,
-    "XRPUSDT": 1.5107,
+    "BTCUSDT": 69766.26,
+    "ETHUSDT": 2084.25,
+    "SOLUSDT": 88.36,
+    "XRPUSDT": 1.5033,
     "BNBUSDT": 633.97
   },
   "gemini_usage": {
     "date_utc": "2026-02-14",
     "models": {
       "gemini-3-flash-preview": {
-        "requests_today": 3,
-        "blocked_today": false,
-        "last_error": null,
-        "last_error_at_utc": null
+        "requests_today": 4,
+        "blocked_today": true,
+        "last_error": "HTTP 429 from Gemini API: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3-flash\\nPlease retry in 2.721442817s.\",\n    \"status\": \"RES",
+        "last_error_at_utc": "2026-02-14T23:24:57+00:00"
       },
       "gemini-2.5-flash": {
-        "requests_today": 0,
-        "blocked_today": false,
-        "last_error": null,
-        "last_error_at_utc": null
+        "requests_today": 1,
+        "blocked_today": true,
+        "last_error": "Could not parse JSON object from Gemini output",
+        "last_error_at_utc": "2026-02-14T23:25:00+00:00"
       },
       "gemini-2.5-flash-lite": {
-        "requests_today": 0,
-        "blocked_today": false,
-        "last_error": null,
-        "last_error_at_utc": null
+        "requests_today": 1,
+        "blocked_today": true,
+        "last_error": "Could not parse JSON object from Gemini output",
+        "last_error_at_utc": "2026-02-14T23:25:02+00:00"
       }
     }
   },
-  "last_price": 69998.49
+  "last_price": 633.97
 }
