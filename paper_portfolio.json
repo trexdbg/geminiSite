@@ -51,7 +51,7 @@
         "last_error_at_utc": "2026-02-14T23:24:57+00:00"
       },
       "gemini-2.5-flash": {
-        "requests_today": 2,
+        "requests_today": 3,
         "blocked_today": false,
         "last_error": null,
         "last_error_full": null,
@@ -66,5 +66,5 @@
       }
     }
   },
-  "last_price": 69798.57
+  "last_price": 632.25
 }
