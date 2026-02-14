@@ -14,6 +14,7 @@ let valueChart = null;
 let exposureChart = null;
 let selectedDecisionId = null;
 let activeInsightTab = "inspect";
+let activeMainView = "dashboard";
 
 const el = {
   statusMessage: document.getElementById("statusMessage"),
@@ -47,6 +48,10 @@ const el = {
   inspectHeadline: document.getElementById("inspectHeadline"),
   inspectHeadlineLink: document.getElementById("inspectHeadlineLink"),
   inspectError: document.getElementById("inspectError"),
+  viewBtnDashboard: document.getElementById("viewBtnDashboard"),
+  viewBtnHistory: document.getElementById("viewBtnHistory"),
+  viewPanelDashboard: document.getElementById("viewPanelDashboard"),
+  viewPanelHistory: document.getElementById("viewPanelHistory"),
   tabBtnInspect: document.getElementById("tabBtnInspect"),
   tabBtnTrades: document.getElementById("tabBtnTrades"),
   tabPanelInspect: document.getElementById("tabPanelInspect"),
@@ -513,6 +518,41 @@ function makeEmptyRow(tbody, colSpan, message) {
   cell.className = "text-neutral";
   row.appendChild(cell);
   tbody.appendChild(row);
+}
+
+function setMainView(viewName) {
+  const showDashboard = viewName !== "history";
+  activeMainView = showDashboard ? "dashboard" : "history";
+
+  if (!el.viewBtnDashboard || !el.viewBtnHistory || !el.viewPanelDashboard || !el.viewPanelHistory) {
+    return;
+  }
+
+  el.viewBtnDashboard.classList.toggle("is-active", showDashboard);
+  el.viewBtnHistory.classList.toggle("is-active", !showDashboard);
+  el.viewBtnDashboard.setAttribute("aria-selected", String(showDashboard));
+  el.viewBtnHistory.setAttribute("aria-selected", String(!showDashboard));
+
+  el.viewPanelDashboard.classList.toggle("hidden", !showDashboard);
+  el.viewPanelHistory.classList.toggle("hidden", showDashboard);
+  el.viewPanelDashboard.classList.toggle("is-active", showDashboard);
+  el.viewPanelHistory.classList.toggle("is-active", !showDashboard);
+}
+
+function initMainViewSwitch() {
+  if (!el.viewBtnDashboard || !el.viewBtnHistory) {
+    return;
+  }
+
+  el.viewBtnDashboard.addEventListener("click", () => {
+    setMainView("dashboard");
+  });
+
+  el.viewBtnHistory.addEventListener("click", () => {
+    setMainView("history");
+  });
+
+  setMainView(activeMainView);
 }
 
 function setInsightTab(tabName) {
@@ -1175,6 +1215,7 @@ function boot() {
     Chart.defaults.color = "#d9e8f1";
   }
 
+  initMainViewSwitch();
   initInsightTabs();
   loadDashboard();
   window.setInterval(() => loadDashboard(true), REFRESH_INTERVAL_MS);

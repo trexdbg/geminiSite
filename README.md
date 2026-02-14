@@ -11,7 +11,7 @@ Dashboard statique pour suivre les decisions de trading crypto et le portefeuill
 
 - Derniere decision avec indicateur couleur (vert, rouge, orange).
 - Bloc "Dernieres news marche" avec headlines dedoublonnees + liens source.
-- Panneau detail a onglets: "Pourquoi ce trade ici ?" + "Historique des trades".
+- Vue dediee "Historique + pourquoi" avec historique des decisions, detail du pourquoi et executions.
 - KPIs portefeuille (valeur totale, cash, performance, frais, positions ouvertes).
 - Graphique de suivi de la valeur portefeuille avec points BUY / SELL / HOLD.
 - Repartition des positions ouvertes.
