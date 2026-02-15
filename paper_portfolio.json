@@ -2,9 +2,9 @@
   "version": 2,
   "created_at_utc": "2026-02-14T19:40:59+00:00",
   "initial_cash_usdt": 100.0,
-  "cash_usdt": 100.0,
-  "fees_paid_usdt": 0.0,
-  "trade_count": 0,
+  "cash_usdt": 72.31819999999999,
+  "fees_paid_usdt": 0.02765414585414586,
+  "trade_count": 1,
   "positions": {
     "BTCUSDT": {
       "asset_symbol": "BTC",
@@ -23,8 +23,8 @@
     },
     "XRPUSDT": {
       "asset_symbol": "XRP",
-      "asset_amount": 0.0,
-      "position_cost_usdt": 0.0
+      "asset_amount": 17.052455852489487,
+      "position_cost_usdt": 27.681800000000006
     },
     "BNBUSDT": {
       "asset_symbol": "BNB",
@@ -32,19 +32,34 @@
       "position_cost_usdt": 0.0
     }
   },
-  "history": [],
+  "history": [
+    {
+      "timestamp_utc": "2026-02-15T08:55:38+00:00",
+      "symbol": "XRPUSDT",
+      "action": "BUY",
+      "allocation_pct": 27.6818,
+      "price": 1.62171,
+      "reference_price": 1.6209,
+      "slippage_bps": 5.0,
+      "qty": 17.0524558525,
+      "notional_usdt": 27.6541,
+      "fee_usdt": 0.027654,
+      "reason": "Override anti-HOLD: signal haussier net (score local +2.85) avec tendance UP.",
+      "confidence": 0.778
+    }
+  ],
   "last_prices": {
-    "BTCUSDT": 70697.53,
-    "ETHUSDT": 2086.39,
-    "SOLUSDT": 90.9,
-    "XRPUSDT": 1.6651,
-    "BNBUSDT": 640.02
+    "BTCUSDT": 70400.48,
+    "ETHUSDT": 2067.07,
+    "SOLUSDT": 89.64,
+    "XRPUSDT": 1.6209,
+    "BNBUSDT": 631.0
   },
   "gemini_usage": {
     "date_utc": "2026-02-15",
     "models": {
       "gemini-3-flash-preview": {
-        "requests_today": 6,
+        "requests_today": 7,
         "blocked_today": false,
         "last_error": null,
         "last_error_full": null,
@@ -66,5 +81,5 @@
       }
     }
   },
-  "last_price": 1.6651
+  "last_price": 1.6209
 }
