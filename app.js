@@ -18,10 +18,20 @@ const VALUE_RANGE_DAYS = {
 
 let valueChart = null;
 let exposureChart = null;
+let inspectTradeChart = null;
 let selectedDecisionId = null;
 let activeMainView = "dashboard";
 let activeValueRange = "1m";
 let latestValueSeries = [];
+let activeInspectorEntry = null;
+
+const INSPECT_INDICATOR_META = {
+  ema20: { label: "EMA20", color: "#3ad0ff", axis: "y" },
+  ema50: { label: "EMA50", color: "#f6a928", axis: "y" },
+  ema200: { label: "EMA200", color: "#8cc3ff", axis: "y" },
+  rsi: { label: "RSI", color: "#73e4bd", axis: "yRsi" },
+  atr_pct: { label: "ATR%", color: "#ff9f6f", axis: "yPct" }
+};
 
 const el = {
   statusMessage: document.getElementById("statusMessage"),
@@ -57,6 +67,9 @@ const el = {
   inspectHeadline: document.getElementById("inspectHeadline"),
   inspectHeadlineLink: document.getElementById("inspectHeadlineLink"),
   inspectError: document.getElementById("inspectError"),
+  inspectTradeChart: document.getElementById("inspectTradeChart"),
+  inspectChartNote: document.getElementById("inspectChartNote"),
+  inspectIndicatorInputs: Array.from(document.querySelectorAll("[data-inspect-indicator]")),
   viewBtnDashboard: document.getElementById("viewBtnDashboard"),
   viewBtnHistory: document.getElementById("viewBtnHistory"),
   viewPanelDashboard: document.getElementById("viewPanelDashboard"),
@@ -246,6 +259,19 @@ function formatPrice(value) {
   const abs = Math.abs(price);
   const digits = abs >= 1000 ? 2 : abs >= 10 ? 3 : abs >= 1 ? 4 : 6;
   return formatUsdt(price, digits);
+}
+
+function formatPriceNumber(value) {
+  const price = toNumber(value);
+  if (price === null) {
+    return "-";
+  }
+  const abs = Math.abs(price);
+  const digits = abs >= 1000 ? 2 : abs >= 10 ? 3 : abs >= 1 ? 4 : 6;
+  return new Intl.NumberFormat("fr-FR", {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
+  }).format(price);
 }
 
 function formatPct(value, digits = 2) {
@@ -801,6 +827,357 @@ function getDecisionExecutionSummary(entry, compact = false) {
   return parts.join(" | ");
 }
 
+function destroyInspectorTradeChart() {
+  if (inspectTradeChart) {
+    inspectTradeChart.destroy();
+    inspectTradeChart = null;
+  }
+}
+
+function setInspectorChartNote(message, toneClass = "text-neutral") {
+  if (!el.inspectChartNote) {
+    return;
+  }
+  el.inspectChartNote.textContent = message;
+  el.inspectChartNote.className = `inspect-chart-note ${toneClass}`;
+}
+
+function setInspectorIndicatorAvailability(availableKeys = new Set()) {
+  if (!Array.isArray(el.inspectIndicatorInputs) || !el.inspectIndicatorInputs.length) {
+    return;
+  }
+
+  for (const input of el.inspectIndicatorInputs) {
+    const isAvailable = availableKeys.has(input.value);
+    input.disabled = !isAvailable;
+
+    const label = input.closest("label");
+    if (label) {
+      label.classList.toggle("is-disabled", !isAvailable);
+    }
+  }
+}
+
+function getSelectedInspectorIndicatorKeys() {
+  if (!Array.isArray(el.inspectIndicatorInputs) || !el.inspectIndicatorInputs.length) {
+    return [];
+  }
+
+  return el.inspectIndicatorInputs
+    .filter((input) => !input.disabled && input.checked && INSPECT_INDICATOR_META[input.value])
+    .map((input) => input.value);
+}
+
+function normalizeSymbolLookupKey(symbol) {
+  return String(symbol || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+}
+
+function getLastCandlesBlock(entry, symbol) {
+  const lastCandles = entry?.last_candles;
+  if (lastCandles && typeof lastCandles === "object") {
+    const wanted = normalizeSymbolLookupKey(symbol || getDecisionSymbol(entry));
+
+    if (wanted) {
+      for (const [symbolKey, block] of Object.entries(lastCandles)) {
+        if (normalizeSymbolLookupKey(symbolKey) === wanted) {
+          return block;
+        }
+      }
+    }
+
+    for (const block of Object.values(lastCandles)) {
+      if (!block || typeof block !== "object") {
+        continue;
+      }
+      if (Array.isArray(block.candles) || block.last_candle || toNumber(block.t) !== null) {
+        return block;
+      }
+    }
+  }
+
+  return entry?.last_candle || null;
+}
+
+function normalizeInspectorCandle(rawCandle) {
+  if (!rawCandle || typeof rawCandle !== "object") {
+    return null;
+  }
+
+  const timestamp =
+    toNumber(rawCandle.t) ??
+    parseDate(rawCandle.timestamp_utc)?.getTime() ??
+    parseDate(rawCandle.timestamp)?.getTime();
+  const close = toNumber(rawCandle.c ?? rawCandle.close ?? rawCandle.price);
+
+  if (timestamp === null || close === null) {
+    return null;
+  }
+
+  const indicators = rawCandle.indicators && typeof rawCandle.indicators === "object" ? rawCandle.indicators : {};
+
+  return {
+    t: timestamp,
+    o: toNumber(rawCandle.o ?? rawCandle.open),
+    h: toNumber(rawCandle.h ?? rawCandle.high),
+    l: toNumber(rawCandle.l ?? rawCandle.low),
+    c: close,
+    indicators
+  };
+}
+
+function extractInspectorCandles(entry, symbol) {
+  const block = getLastCandlesBlock(entry, symbol);
+  if (!block) {
+    return [];
+  }
+
+  let source = [];
+  if (Array.isArray(block.candles)) {
+    source = block.candles;
+  } else if (Array.isArray(block)) {
+    source = block;
+  } else if (block.last_candle && typeof block.last_candle === "object") {
+    source = [block.last_candle];
+  } else if (typeof block === "object") {
+    source = [block];
+  }
+
+  const dedupByTime = new Map();
+  for (const rawCandle of source) {
+    const normalized = normalizeInspectorCandle(rawCandle);
+    if (!normalized) {
+      continue;
+    }
+    dedupByTime.set(normalized.t, normalized);
+  }
+
+  return Array.from(dedupByTime.values()).sort((a, b) => a.t - b.t);
+}
+
+function collectInspectorAvailableIndicators(candles) {
+  const available = new Set();
+
+  for (const candle of candles) {
+    const indicators = candle?.indicators;
+    if (!indicators || typeof indicators !== "object") {
+      continue;
+    }
+
+    for (const indicatorKey of Object.keys(INSPECT_INDICATOR_META)) {
+      if (toNumber(indicators[indicatorKey]) !== null) {
+        available.add(indicatorKey);
+      }
+    }
+  }
+
+  return available;
+}
+
+function getInspectorTimeframe(entry, symbol) {
+  const block = getLastCandlesBlock(entry, symbol);
+  return maybeFixText(block?.timeframe || entry?.timeframe || "");
+}
+
+function buildInspectorIndicatorDataset(candles, indicatorKey) {
+  const meta = INSPECT_INDICATOR_META[indicatorKey];
+  if (!meta) {
+    return null;
+  }
+
+  const values = candles.map((candle) => toNumber(candle?.indicators?.[indicatorKey]));
+  if (!values.some((value) => value !== null)) {
+    return null;
+  }
+
+  return {
+    label: meta.label,
+    data: values,
+    yAxisID: meta.axis,
+    borderColor: meta.color,
+    backgroundColor: meta.color,
+    borderWidth: meta.axis === "y" ? 1.8 : 1.6,
+    borderDash: meta.axis === "y" ? [] : [6, 4],
+    tension: 0.2,
+    pointRadius: 0,
+    spanGaps: true
+  };
+}
+
+function renderInspectorTradeChart(entry) {
+  if (!el.inspectTradeChart || !el.inspectChartNote) {
+    return;
+  }
+
+  if (!window.Chart) {
+    destroyInspectorTradeChart();
+    setInspectorChartNote("Chart indisponible: Chart.js non charge.", "text-negative");
+    return;
+  }
+
+  if (!entry) {
+    destroyInspectorTradeChart();
+    setInspectorIndicatorAvailability(new Set());
+    setInspectorChartNote("Selectionne une decision pour afficher le chart.", "text-neutral");
+    return;
+  }
+
+  const symbol = getDecisionSymbol(entry);
+  const candles = extractInspectorCandles(entry, symbol);
+
+  if (!candles.length) {
+    destroyInspectorTradeChart();
+    setInspectorIndicatorAvailability(new Set());
+    setInspectorChartNote("Aucune serie candles disponible via last_candle pour cette decision.", "text-negative");
+    return;
+  }
+
+  const availableIndicators = collectInspectorAvailableIndicators(candles);
+  setInspectorIndicatorAvailability(availableIndicators);
+
+  const selectedIndicators = getSelectedInspectorIndicatorKeys();
+  const labels = candles.map((candle) => formatDate(new Date(candle.t)));
+
+  const datasets = [
+    {
+      label: `${symbol} close`,
+      data: candles.map((candle) => candle.c),
+      yAxisID: "y",
+      borderColor: "#d9e8f1",
+      backgroundColor: "rgba(217, 232, 241, 0.12)",
+      borderWidth: 2.1,
+      tension: 0.22,
+      pointRadius: 0,
+      spanGaps: true
+    }
+  ];
+
+  for (const indicatorKey of selectedIndicators) {
+    const dataset = buildInspectorIndicatorDataset(candles, indicatorKey);
+    if (dataset) {
+      datasets.push(dataset);
+    }
+  }
+
+  destroyInspectorTradeChart();
+
+  inspectTradeChart = new Chart(el.inspectTradeChart, {
+    type: "line",
+    data: {
+      labels,
+      datasets
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: {
+        mode: "index",
+        intersect: false
+      },
+      plugins: {
+        legend: {
+          position: "bottom",
+          labels: {
+            color: "#d9e8f1",
+            boxWidth: 14
+          }
+        },
+        tooltip: {
+          callbacks: {
+            label(context) {
+              const value = toNumber(context.raw);
+              if (value === null) {
+                return null;
+              }
+
+              if (context.dataset.yAxisID === "yPct") {
+                return `${context.dataset.label}: ${value.toFixed(2)}%`;
+              }
+
+              if (context.dataset.yAxisID === "yRsi") {
+                return `${context.dataset.label}: ${value.toFixed(2)}`;
+              }
+
+              return `${context.dataset.label}: ${formatPrice(value)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: "#a8c2d1",
+            maxTicksLimit: 8,
+            maxRotation: 0
+          },
+          grid: { color: "rgba(130, 168, 186, 0.18)" }
+        },
+        y: {
+          position: "left",
+          ticks: {
+            color: "#a8c2d1",
+            callback(value) {
+              return formatPriceNumber(value);
+            }
+          },
+          grid: { color: "rgba(130, 168, 186, 0.18)" }
+        },
+        yRsi: {
+          display: selectedIndicators.includes("rsi"),
+          position: "right",
+          min: 0,
+          max: 100,
+          grid: { drawOnChartArea: false },
+          ticks: {
+            color: "#73e4bd",
+            callback(value) {
+              const numeric = toNumber(value);
+              return numeric === null ? "-" : numeric.toFixed(0);
+            }
+          }
+        },
+        yPct: {
+          display: selectedIndicators.includes("atr_pct"),
+          position: "right",
+          offset: true,
+          grid: { drawOnChartArea: false },
+          ticks: {
+            color: "#ffb98c",
+            callback(value) {
+              const numeric = toNumber(value);
+              return numeric === null ? "-" : `${numeric.toFixed(2)}%`;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  const timeframe = getInspectorTimeframe(entry, symbol);
+  const lastClose = candles.at(-1)?.c;
+  const timeframeText = timeframe ? ` | TF ${timeframe}` : "";
+  setInspectorChartNote(
+    `${symbol} | ${candles.length} bougies${timeframeText} | Derniere cloture ${formatPrice(lastClose)}`,
+    "text-neutral"
+  );
+}
+
+function initInspectorIndicatorControls() {
+  if (!Array.isArray(el.inspectIndicatorInputs) || !el.inspectIndicatorInputs.length) {
+    return;
+  }
+
+  for (const input of el.inspectIndicatorInputs) {
+    input.addEventListener("change", () => {
+      if (!activeInspectorEntry) {
+        return;
+      }
+      renderInspectorTradeChart(activeInspectorEntry);
+    });
+  }
+}
+
 function renderDecisionInspector(entry) {
   const inspectorReady =
     el.inspectActionBadge &&
@@ -821,6 +1198,7 @@ function renderDecisionInspector(entry) {
   }
 
   if (!entry) {
+    activeInspectorEntry = null;
     setActionBadge(el.inspectActionBadge, "HOLD");
     el.inspectTime.textContent = "-";
     el.inspectSymbol.textContent = "-";
@@ -837,8 +1215,11 @@ function renderDecisionInspector(entry) {
     el.inspectHeadlineLink.classList.add("hidden");
     el.inspectError.textContent = "";
     el.inspectError.classList.add("hidden");
+    renderInspectorTradeChart(null);
     return;
   }
+
+  activeInspectorEntry = entry;
 
   const action = getAction(entry);
   const sentiment = getSentiment(entry);
@@ -857,6 +1238,7 @@ function renderDecisionInspector(entry) {
   el.inspectReason.textContent = reason;
   el.inspectRisk.textContent = risk;
   el.inspectExecution.textContent = getDecisionExecutionSummary(entry);
+  renderInspectorTradeChart(entry);
 
   if (headline) {
     const scoreText = headline.sentimentScore === null ? "n/a" : headline.sentimentScore.toFixed(2);
@@ -1394,6 +1776,7 @@ function boot() {
 
   initMainViewSwitch();
   initValueRangeSwitch();
+  initInspectorIndicatorControls();
   loadDashboard();
   window.setInterval(() => loadDashboard(true), REFRESH_INTERVAL_MS);
 }

@@ -227,6 +227,24 @@
               <p>Sentiment: <strong id="inspectSentiment">-</strong></p>
               <p>Modele: <strong id="inspectModel">-</strong></p>
             </div>
+            <div class="inspect-chart-block">
+              <div class="inspect-chart-head">
+                <p class="inspect-chart-title">Contexte marche (last candle)</p>
+                <div class="inspect-indicator-controls">
+                  <label><input type="checkbox" data-inspect-indicator value="ema20" checked /> EMA20</label>
+                  <label><input type="checkbox" data-inspect-indicator value="ema50" checked /> EMA50</label>
+                  <label><input type="checkbox" data-inspect-indicator value="ema200" /> EMA200</label>
+                  <label><input type="checkbox" data-inspect-indicator value="rsi" /> RSI</label>
+                  <label><input type="checkbox" data-inspect-indicator value="atr_pct" /> ATR%</label>
+                </div>
+              </div>
+              <div class="inspect-chart-wrap">
+                <canvas id="inspectTradeChart" aria-label="Chart du trade selectionne" role="img"></canvas>
+              </div>
+              <p class="inspect-chart-note text-neutral" id="inspectChartNote">
+                Selectionne une decision pour afficher le chart.
+              </p>
+            </div>
             <p class="decision-reason" id="inspectReason">-</p>
             <p class="decision-risk" id="inspectRisk">-</p>
             <p class="inspect-extra text-neutral" id="inspectExecution">-</p>
@@ -239,6 +257,6 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-    <script src="./app.js?v=20260214-9" type="module"></script>
+    <script src="./app.js?v=20260215-10" type="module"></script>
   </body>
 </html>
