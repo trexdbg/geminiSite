@@ -2,14 +2,14 @@
   "version": 2,
   "created_at_utc": "2026-02-15T19:27:39Z",
   "initial_cash_usdt": 100.0,
-  "cash_usdt": 100.0,
-  "fees_paid_usdt": 0.0,
-  "trade_count": 0,
+  "cash_usdt": 85.0,
+  "fees_paid_usdt": 0.014985014985014988,
+  "trade_count": 1,
   "positions": {
     "BTCUSDT": {
       "asset_symbol": "BTC",
-      "asset_amount": 0.0,
-      "position_cost_usdt": 0.0
+      "asset_amount": 0.0002192481652412309,
+      "position_cost_usdt": 15.000000000000002
     },
     "ETHUSDT": {
       "asset_symbol": "ETH",
@@ -32,19 +32,34 @@
       "position_cost_usdt": 0.0
     }
   },
-  "history": [],
+  "history": [
+    {
+      "timestamp_utc": "2026-02-15T20:02:09+00:00",
+      "symbol": "BTCUSDT",
+      "action": "BUY",
+      "allocation_pct": 15.0,
+      "price": 68347.27656,
+      "reference_price": 68313.12,
+      "slippage_bps": 5.0,
+      "qty": 0.0002192482,
+      "notional_usdt": 14.985,
+      "fee_usdt": 0.014985,
+      "reason": "Le r\u00e9gime est en tendance baissi\u00e8re forte mais l'indicateur RSI \u00e0 28.7 indique un \u00e9tat de survente critique. On observe un signal de retour \u00e0 la moyenne (mean_reversion_signal) avec une confiance de 0.6819. La derni\u00e8re bougie est de type BULLISH avec un corps occupant 96.16% de la plage, sugg\u00e9rant une absorption locale malgr\u00e9 la pente n\u00e9gative de l'EMA20.",
+      "confidence": 0.65
+    }
+  ],
   "last_prices": {
-    "BNBUSDT": 610.93,
-    "BTCUSDT": 68351.99,
-    "SOLUSDT": 85.32,
-    "ETHUSDT": 1934.92,
-    "XRPUSDT": 1.454
+    "BNBUSDT": 611.41,
+    "BTCUSDT": 68313.12,
+    "SOLUSDT": 85.2,
+    "ETHUSDT": 1938.54,
+    "XRPUSDT": 1.4535
   },
   "gemini_usage": {
     "date_utc": "2026-02-15",
     "models": {
       "gemini-3-flash-preview": {
-        "requests_today": 2,
+        "requests_today": 3,
         "blocked_today": false,
         "last_error": null,
         "last_error_full": null,
@@ -66,5 +81,5 @@
       }
     }
   },
-  "last_price": 68351.99
+  "last_price": 68313.12
 }
