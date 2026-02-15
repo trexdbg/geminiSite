@@ -2,9 +2,9 @@
   "version": 2,
   "created_at_utc": "2026-02-15T19:27:39Z",
   "initial_cash_usdt": 100.0,
-  "cash_usdt": 85.0,
-  "fees_paid_usdt": 0.014985014985014988,
-  "trade_count": 1,
+  "cash_usdt": 72.25,
+  "fees_paid_usdt": 0.027722277722277727,
+  "trade_count": 2,
   "positions": {
     "BTCUSDT": {
       "asset_symbol": "BTC",
@@ -18,8 +18,8 @@
     },
     "SOLUSDT": {
       "asset_symbol": "SOL",
-      "asset_amount": 0.0,
-      "position_cost_usdt": 0.0
+      "asset_amount": 0.14888197039666037,
+      "position_cost_usdt": 12.75
     },
     "XRPUSDT": {
       "asset_symbol": "XRP",
@@ -46,20 +46,34 @@
       "fee_usdt": 0.014985,
       "reason": "Le r\u00e9gime est en tendance baissi\u00e8re forte mais l'indicateur RSI \u00e0 28.7 indique un \u00e9tat de survente critique. On observe un signal de retour \u00e0 la moyenne (mean_reversion_signal) avec une confiance de 0.6819. La derni\u00e8re bougie est de type BULLISH avec un corps occupant 96.16% de la plage, sugg\u00e9rant une absorption locale malgr\u00e9 la pente n\u00e9gative de l'EMA20.",
       "confidence": 0.65
+    },
+    {
+      "timestamp_utc": "2026-02-15T20:19:12+00:00",
+      "symbol": "SOLUSDT",
+      "action": "BUY",
+      "allocation_pct": 15.0,
+      "price": 85.552755,
+      "reference_price": 85.51,
+      "slippage_bps": 5.0,
+      "qty": 0.1488819704,
+      "notional_usdt": 12.7373,
+      "fee_usdt": 0.012737,
+      "reason": "Signal de retour \u00e0 la moyenne identifi\u00e9 avec une confiance de 0.7258 dans un r\u00e9gime de volatilit\u00e9 faible (ATR 0.78%). Le prix pr\u00e9sente un z-score de -2.17 par rapport \u00e0 l'EMA50, indiquant une extension baissi\u00e8re excessive. La bougie actuelle est haussi\u00e8re avec un rejet des points bas (wick ratio 0.52), sugg\u00e9rant un support local proche de l'EMA200.",
+      "confidence": 0.72
     }
   ],
   "last_prices": {
-    "BNBUSDT": 611.41,
-    "BTCUSDT": 68313.12,
-    "SOLUSDT": 85.2,
-    "ETHUSDT": 1938.54,
-    "XRPUSDT": 1.4535
+    "BNBUSDT": 612.23,
+    "BTCUSDT": 68440.14,
+    "SOLUSDT": 85.51,
+    "ETHUSDT": 1942.82,
+    "XRPUSDT": 1.4506
   },
   "gemini_usage": {
     "date_utc": "2026-02-15",
     "models": {
       "gemini-3-flash-preview": {
-        "requests_today": 3,
+        "requests_today": 4,
         "blocked_today": false,
         "last_error": null,
         "last_error_full": null,
@@ -81,5 +95,5 @@
       }
     }
   },
-  "last_price": 68313.12
+  "last_price": 68440.14
 }
