@@ -105,11 +105,11 @@
     }
   ],
   "last_prices": {
-    "BTCUSDT": 69036.56,
-    "ETHUSDT": 2009.93,
-    "SOLUSDT": 87.53,
-    "XRPUSDT": 1.5212,
-    "BNBUSDT": 619.12
+    "BTCUSDT": 69056.39,
+    "ETHUSDT": 1998.57,
+    "SOLUSDT": 87.54,
+    "XRPUSDT": 1.5104,
+    "BNBUSDT": 618.66
   },
   "gemini_usage": {
     "date_utc": "2026-02-15",
@@ -122,7 +122,7 @@
         "last_error_at_utc": null
       },
       "gemini-2.5-flash": {
-        "requests_today": 6,
+        "requests_today": 7,
         "blocked_today": false,
         "last_error": null,
         "last_error_full": null,
@@ -137,5 +137,5 @@
       }
     }
   },
-  "last_price": 1.5212
+  "last_price": 1.5104
 }
