@@ -153,10 +153,159 @@ function getDecisionId(entry) {
   if (!entry) {
     return "";
   }
+  if (entry.__scope_id) {
+    return entry.__scope_id;
+  }
   const timestamp = entry.timestamp_utc || "";
   const symbol = getDecisionSymbol(entry);
   const action = getAction(entry);
   return `${timestamp}|${symbol}|${action}`;
+}
+
+function getEntryDecisionBlocks(entry) {
+  const blocks = [];
+
+  if (Array.isArray(entry?.decisions)) {
+    blocks.push(...entry.decisions.filter((item) => item && typeof item === "object"));
+  }
+
+  if (entry?.decision && typeof entry.decision === "object") {
+    blocks.push(entry.decision);
+  }
+
+  if (!blocks.length) {
+    return [];
+  }
+
+  const deduped = [];
+  const seenSymbols = new Set();
+
+  for (const block of blocks) {
+    const symbolKey = normalizeSymbolLookupKey(block?.symbol || entry?.symbol || "");
+    if (symbolKey) {
+      if (seenSymbols.has(symbolKey)) {
+        continue;
+      }
+      seenSymbols.add(symbolKey);
+    }
+    deduped.push(block);
+  }
+
+  return deduped;
+}
+
+function getEntryExecutionBlocks(entry) {
+  const blocks = [];
+
+  if (Array.isArray(entry?.executions)) {
+    blocks.push(...entry.executions.filter((item) => item && typeof item === "object"));
+  }
+
+  if (entry?.execution && typeof entry.execution === "object") {
+    blocks.push(entry.execution);
+  }
+
+  if (!blocks.length) {
+    return [];
+  }
+
+  const deduped = [];
+  const seen = new Set();
+
+  for (const block of blocks) {
+    const symbolKey = normalizeSymbolLookupKey(block?.symbol || entry?.symbol || "");
+    const actionKey = normalizeAction(block?.action_fr || block?.action || block?.status_fr || block?.status);
+    const statusKey = maybeFixText(block?.status || block?.status_fr || "");
+    const qtyKey = toNumber(block?.executed_qty) ?? "";
+    const notionalKey = toNumber(block?.executed_notional_usdt) ?? "";
+    const dedupeKey = `${symbolKey}|${actionKey}|${statusKey}|${qtyKey}|${notionalKey}`;
+
+    if (seen.has(dedupeKey)) {
+      continue;
+    }
+    seen.add(dedupeKey);
+    deduped.push(block);
+  }
+
+  return deduped;
+}
+
+function createScopedDecisionEntry(entry, decision, execution, scopeIndex = 0, symbolHint = "") {
+  const symbol =
+    maybeFixText(decision?.symbol || execution?.symbol || symbolHint || entry?.symbol || "-") || "-";
+  const scopedDecision = decision && typeof decision === "object" ? decision : null;
+  const scopedExecution = execution && typeof execution === "object" ? execution : null;
+  const scoped = {
+    ...entry,
+    symbol,
+    decision: scopedDecision,
+    execution: scopedExecution
+  };
+
+  const timestamp = scoped.timestamp_utc || "";
+  const action = getAction(scoped);
+  scoped.__scope_index = scopeIndex;
+  scoped.__scope_id = `${timestamp}|${symbol}|${action}|${scopeIndex}`;
+
+  return scoped;
+}
+
+function getScopedDecisionEntries(entry) {
+  if (!entry || typeof entry !== "object") {
+    return [];
+  }
+
+  const decisions = getEntryDecisionBlocks(entry);
+  const executions = getEntryExecutionBlocks(entry);
+
+  const executionBySymbol = new Map();
+  for (const execution of executions) {
+    const symbolKey = normalizeSymbolLookupKey(execution?.symbol || "");
+    if (symbolKey && !executionBySymbol.has(symbolKey)) {
+      executionBySymbol.set(symbolKey, execution);
+    }
+  }
+
+  if (decisions.length) {
+    return decisions.map((decision, index) => {
+      const symbol = decision?.symbol || entry?.symbol || executions[index]?.symbol || "-";
+      const symbolKey = normalizeSymbolLookupKey(symbol);
+      const execution = symbolKey ? executionBySymbol.get(symbolKey) || executions[index] || null : executions[index] || null;
+      return createScopedDecisionEntry(entry, decision, execution, index, symbol);
+    });
+  }
+
+  if (executions.length) {
+    return executions.map((execution, index) =>
+      createScopedDecisionEntry(entry, null, execution, index, execution?.symbol || entry?.symbol || "-")
+    );
+  }
+
+  return [createScopedDecisionEntry(entry, entry?.decision || null, entry?.execution || null, 0, entry?.symbol || "-")];
+}
+
+function collectRecentScopedDecisions(decisions, limit = 40) {
+  const scoped = [];
+  for (let index = decisions.length - 1; index >= 0; index -= 1) {
+    const scopedEntries = getScopedDecisionEntries(decisions[index]);
+    for (const scopedEntry of scopedEntries) {
+      scoped.push(scopedEntry);
+      if (scoped.length >= limit) {
+        return scoped;
+      }
+    }
+  }
+  return scoped;
+}
+
+function getLatestScopedDecisionEntry(decisions) {
+  for (let index = decisions.length - 1; index >= 0; index -= 1) {
+    const scopedEntries = getScopedDecisionEntries(decisions[index]);
+    if (scopedEntries.length) {
+      return scopedEntries[0];
+    }
+  }
+  return null;
 }
 
 function getMostImpactfulHeadline(entry) {
@@ -446,32 +595,49 @@ function extractTrades(decisions, portfolio) {
   const list = [];
 
   for (const entry of decisions) {
-    const execution = entry?.execution || {};
-    const action = getAction(entry);
-    const qty = toNumber(execution.executed_qty) || 0;
-    const notional = toNumber(execution.executed_notional_usdt) || 0;
-    const fee = toNumber(execution.fee_usdt) || 0;
-    const status = String(execution.status || "").toUpperCase();
+    const executionBlocks = getEntryExecutionBlocks(entry);
+    const scopedEntries = getScopedDecisionEntries(entry);
 
-    const isExecuted = qty > 0 || Math.abs(notional) > 0;
-    const filledLike = status.includes("FILLED") || status.includes("EXEC") || status.includes("BUY") || status.includes("SELL");
-
-    if (!isExecuted && !filledLike) {
+    if (!executionBlocks.length) {
       continue;
     }
 
-    if (action === "HOLD" && !isExecuted) {
-      continue;
-    }
+    for (let index = 0; index < executionBlocks.length; index += 1) {
+      const execution = executionBlocks[index];
+      const symbol = maybeFixText(execution?.symbol || entry?.symbol || "-") || "-";
+      const symbolKey = normalizeSymbolLookupKey(symbol);
+      const scopedForSymbol =
+        scopedEntries.find((item) => normalizeSymbolLookupKey(getDecisionSymbol(item)) === symbolKey) ||
+        scopedEntries[index] ||
+        createScopedDecisionEntry(entry, null, execution, index, symbol);
 
-    list.push({
-      timestamp: entry.timestamp_utc,
-      symbol: execution.symbol || entry.symbol || entry?.decision?.symbol || "-",
-      action,
-      qty,
-      notional,
-      fee
-    });
+      const action = getAction(scopedForSymbol);
+      const qty = toNumber(execution.executed_qty) || 0;
+      const notional = toNumber(execution.executed_notional_usdt) || 0;
+      const fee = toNumber(execution.fee_usdt) || 0;
+      const status = String(execution.status || "").toUpperCase();
+
+      const isExecuted = qty > 0 || Math.abs(notional) > 0;
+      const filledLike =
+        status.includes("FILLED") || status.includes("EXEC") || status.includes("BUY") || status.includes("SELL");
+
+      if (!isExecuted && !filledLike) {
+        continue;
+      }
+
+      if (action === "HOLD" && !isExecuted) {
+        continue;
+      }
+
+      list.push({
+        timestamp: entry.timestamp_utc,
+        symbol,
+        action,
+        qty,
+        notional,
+        fee
+      });
+    }
   }
 
   const history = Array.isArray(portfolio?.history) ? portfolio.history : [];
@@ -789,39 +955,86 @@ function initValueRangeSwitch() {
   applyValueRangeButtonState();
 }
 
+function getExecutionStatusInfo(entry) {
+  const execution = entry?.execution || {};
+  const action = getAction(entry);
+  const qty = toNumber(execution.executed_qty) || 0;
+  const notional = toNumber(execution.executed_notional_usdt) || 0;
+  const isExecuted = qty > 0 || Math.abs(notional) > 0;
+
+  const statusRaw = String(execution.status || "").toUpperCase();
+  const statusFrRaw = maybeFixText(execution.status_fr || "").toUpperCase();
+  const isIgnored = statusRaw.includes("SKIPPED") || statusFrRaw.includes("IGNORE");
+
+  let ignoredReason = "";
+  if (statusRaw.includes("TOO_SMALL") || statusFrRaw.includes("TROP_PETITE") || statusFrRaw.includes("TROP_PETIT")) {
+    ignoredReason = "taille trop petite";
+  } else if (statusRaw.includes("NO_POSITION") || statusFrRaw.includes("SANS_POSITION")) {
+    ignoredReason = "aucune position ouverte";
+  }
+
+  const actionLabel = ACTION_STYLE[action]?.label || action || "ACTION";
+  const fallbackStatus =
+    maybeFixText(execution.status_fr || execution.status || execution.action_fr || execution.action) ||
+    (isExecuted ? "EXECUTE" : "NON EXECUTE");
+  const statusLabel = isIgnored
+    ? `${actionLabel} IGNOREE${ignoredReason ? ` (${ignoredReason})` : ""}`
+    : fallbackStatus;
+
+  return {
+    action,
+    isExecuted,
+    isIgnored,
+    isIgnoredSell: action === "SELL" && isIgnored,
+    statusLabel
+  };
+}
+
+function getInspectorExecutionToneClass(entry) {
+  const info = getExecutionStatusInfo(entry);
+  if (info.isIgnoredSell) {
+    return "text-neutral";
+  }
+  if (info.isExecuted) {
+    if (info.action === "BUY") {
+      return "text-positive";
+    }
+    if (info.action === "SELL") {
+      return "text-negative";
+    }
+  }
+  return "text-neutral";
+}
+
 function getDecisionExecutionSummary(entry, compact = false) {
   const execution = entry?.execution || {};
+  const statusInfo = getExecutionStatusInfo(entry);
   const qty = toNumber(execution.executed_qty) || 0;
   const notional = toNumber(execution.executed_notional_usdt) || 0;
   const fee = toNumber(execution.fee_usdt) || 0;
   const allocation = toNumber(execution.allocation_pct ?? entry?.decision?.allocation_pct);
-  const status =
-    maybeFixText(execution.status_fr || execution.status || execution.action_fr || execution.action) ||
-    (qty > 0 || Math.abs(notional) > 0 ? "EXECUTE" : "NON EXECUTE");
-
-  const isExecuted = qty > 0 || Math.abs(notional) > 0;
 
   if (compact) {
-    if (isExecuted) {
-      return `${status} | ${formatUsdt(notional)}`;
+    if (statusInfo.isExecuted) {
+      return `${statusInfo.statusLabel} | ${formatUsdt(notional)}`;
     }
-    if (getAction(entry) === "HOLD") {
+    if (statusInfo.action === "HOLD") {
       return "Pas d'execution";
     }
-    return `${status} | sans fill`;
+    return `${statusInfo.statusLabel} | sans fill`;
   }
 
-  const parts = [`Statut: ${status}`];
+  const parts = [`Statut: ${statusInfo.statusLabel}`];
   if (allocation !== null) {
     parts.push(`Allocation cible: ${allocation.toFixed(1)}%`);
   }
 
-  if (isExecuted) {
+  if (statusInfo.isExecuted) {
     parts.push(`Quantite: ${formatQty(qty)}`);
     parts.push(`Notional: ${formatUsdt(notional)}`);
     parts.push(`Fee: ${formatUsdt(fee, 4)}`);
   } else {
-    parts.push("Aucune execution detectee");
+    parts.push(statusInfo.isIgnored ? "Execution ignoree par les garde-fous." : "Aucune execution detectee");
   }
 
   return parts.join(" | ");
@@ -1029,7 +1242,7 @@ function renderInspectorTradeChart(entry) {
   if (!candles.length) {
     destroyInspectorTradeChart();
     setInspectorIndicatorAvailability(new Set());
-    setInspectorChartNote("Aucune serie candles disponible via last_candle pour cette decision.", "text-negative");
+    setInspectorChartNote("Aucune serie candles disponible via last_candle/last_candles pour cette decision.", "text-negative");
     return;
   }
 
@@ -1209,6 +1422,7 @@ function renderDecisionInspector(entry) {
     el.inspectSentiment.className = "";
     el.inspectReason.textContent = "Selectionne une decision pour voir le detail du pourquoi.";
     el.inspectRisk.textContent = "-";
+    el.inspectExecution.className = "inspect-extra text-neutral";
     el.inspectExecution.textContent = "-";
     el.inspectHeadline.textContent = "-";
     el.inspectHeadlineLink.href = "#";
@@ -1237,6 +1451,7 @@ function renderDecisionInspector(entry) {
   el.inspectSentiment.className = getSentimentTone(sentiment);
   el.inspectReason.textContent = reason;
   el.inspectRisk.textContent = risk;
+  el.inspectExecution.className = `inspect-extra ${getInspectorExecutionToneClass(entry)}`;
   el.inspectExecution.textContent = getDecisionExecutionSummary(entry);
   renderInspectorTradeChart(entry);
 
@@ -1343,7 +1558,7 @@ function renderDecisionsTable(decisions) {
   const tbody = el.decisionsTableBody;
   tbody.innerHTML = "";
 
-  const latest = decisions.slice(-40).reverse();
+  const latest = collectRecentScopedDecisions(decisions, 40);
   if (!latest.length) {
     makeEmptyRow(tbody, 7, "Aucune decision disponible.");
     renderDecisionInspector(null);
@@ -1677,10 +1892,12 @@ function renderExposureChart(positionRows, cash) {
 function computeDashboard(decisions, portfolio) {
   const sorted = decisions.slice().sort((a, b) => getEntryTimestamp(a) - getEntryTimestamp(b));
   const latest = sorted.at(-1) || null;
+  const latestDecision = getLatestScopedDecisionEntry(sorted);
 
   const { rows: positionRows, totalExposure } = computePositionRows(portfolio);
   const trades = extractTrades(sorted, portfolio);
   const series = buildSeries(sorted, portfolio);
+  const decisionCount = sorted.reduce((sum, entry) => sum + getScopedDecisionEntries(entry).length, 0);
 
   const cash = toNumber(portfolio?.cash_usdt) ?? toNumber(latest?.portfolio_metrics?.cash_usdt) ?? 0;
   const initial =
@@ -1707,6 +1924,8 @@ function computeDashboard(decisions, portfolio) {
   return {
     sorted,
     latest,
+    latestDecision,
+    decisionCount,
     series,
     trades,
     positionRows,
@@ -1751,7 +1970,7 @@ async function loadDashboard(isRefresh = false) {
     const dashboard = computeDashboard(decisions, portfolio);
 
     renderKpis(dashboard.kpis);
-    renderLatestDecision(dashboard.latest);
+    renderLatestDecision(dashboard.latestDecision || dashboard.latest);
     renderNewsPanel(dashboard.sorted);
     renderDecisionsTable(dashboard.sorted);
     renderPositionsTable(dashboard.positionRows);
@@ -1760,7 +1979,7 @@ async function loadDashboard(isRefresh = false) {
     renderValueChartByRange(dashboard.series);
     renderExposureChart(dashboard.positionRows, dashboard.kpis.cash);
 
-    setStatus(`OK - ${dashboard.sorted.length} decisions chargees.`);
+    setStatus(`OK - ${dashboard.sorted.length} lignes JSON (${dashboard.decisionCount} decisions) chargees.`);
     el.updatedAt.textContent = formatDate(new Date(), true);
   } catch (error) {
     console.error(error);
