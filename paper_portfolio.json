@@ -1,15 +1,15 @@
 {
   "version": 2,
-  "created_at_utc": "2026-02-15T19:27:39Z",
+  "created_at_utc": "2026-02-16T21:50:57+00:00",
   "initial_cash_usdt": 100.0,
-  "cash_usdt": 72.25,
-  "fees_paid_usdt": 0.027722277722277727,
-  "trade_count": 2,
+  "cash_usdt": 75.0,
+  "fees_paid_usdt": 0.02497502497502498,
+  "trade_count": 1,
   "positions": {
     "BTCUSDT": {
       "asset_symbol": "BTC",
-      "asset_amount": 0.0002192481652412309,
-      "position_cost_usdt": 15.000000000000002
+      "asset_amount": 0.0,
+      "position_cost_usdt": 0.0
     },
     "ETHUSDT": {
       "asset_symbol": "ETH",
@@ -18,8 +18,8 @@
     },
     "SOLUSDT": {
       "asset_symbol": "SOL",
-      "asset_amount": 0.14888197039666037,
-      "position_cost_usdt": 12.75
+      "asset_amount": 0.2895886740507354,
+      "position_cost_usdt": 25.000000000000004
     },
     "XRPUSDT": {
       "asset_symbol": "XRP",
@@ -34,53 +34,39 @@
   },
   "history": [
     {
-      "timestamp_utc": "2026-02-15T20:02:09+00:00",
-      "symbol": "BTCUSDT",
-      "action": "BUY",
-      "allocation_pct": 15.0,
-      "price": 68347.27656,
-      "reference_price": 68313.12,
-      "slippage_bps": 5.0,
-      "qty": 0.0002192482,
-      "notional_usdt": 14.985,
-      "fee_usdt": 0.014985,
-      "reason": "Le r\u00e9gime est en tendance baissi\u00e8re forte mais l'indicateur RSI \u00e0 28.7 indique un \u00e9tat de survente critique. On observe un signal de retour \u00e0 la moyenne (mean_reversion_signal) avec une confiance de 0.6819. La derni\u00e8re bougie est de type BULLISH avec un corps occupant 96.16% de la plage, sugg\u00e9rant une absorption locale malgr\u00e9 la pente n\u00e9gative de l'EMA20.",
-      "confidence": 0.65
-    },
-    {
-      "timestamp_utc": "2026-02-15T20:19:12+00:00",
+      "timestamp_utc": "2026-02-16T22:06:55+00:00",
       "symbol": "SOLUSDT",
       "action": "BUY",
-      "allocation_pct": 15.0,
-      "price": 85.552755,
-      "reference_price": 85.51,
+      "allocation_pct": 25.0,
+      "price": 86.2431,
+      "reference_price": 86.2,
       "slippage_bps": 5.0,
-      "qty": 0.1488819704,
-      "notional_usdt": 12.7373,
-      "fee_usdt": 0.012737,
-      "reason": "Signal de retour \u00e0 la moyenne identifi\u00e9 avec une confiance de 0.7258 dans un r\u00e9gime de volatilit\u00e9 faible (ATR 0.78%). Le prix pr\u00e9sente un z-score de -2.17 par rapport \u00e0 l'EMA50, indiquant une extension baissi\u00e8re excessive. La bougie actuelle est haussi\u00e8re avec un rejet des points bas (wick ratio 0.52), sugg\u00e9rant un support local proche de l'EMA200.",
-      "confidence": 0.72
+      "qty": 0.2895886741,
+      "notional_usdt": 24.975,
+      "fee_usdt": 0.024975,
+      "reason": "Pr\u00e9sence d'un momentum BULLISH avec 5 cl\u00f4tures haussi\u00e8res cons\u00e9cutives et une bougie finale cl\u00f4turant au plus haut (close position 1.0). Le score local de 0.6 et le biais de breakout haussier (UPSIDE) confirment une force relative malgr\u00e9 un r\u00e9gime de range global. L'EMA20 pr\u00e9sente une pente positive forte de 0.40.",
+      "confidence": 0.65
     }
   ],
   "last_prices": {
-    "BNBUSDT": 615.72,
-    "BTCUSDT": 67980.1,
-    "SOLUSDT": 84.4,
-    "ETHUSDT": 1980.25,
-    "XRPUSDT": 1.4849
+    "XRPUSDT": 1.4889,
+    "SOLUSDT": 86.2,
+    "ETHUSDT": 1997.21,
+    "BTCUSDT": 68759.91,
+    "BNBUSDT": 627.46
   },
   "gemini_usage": {
     "date_utc": "2026-02-16",
     "models": {
       "gemini-3-flash-preview": {
-        "requests_today": 5,
-        "blocked_today": true,
-        "last_error": "HTTP 429 from Gemini API: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3-flash\\nPlease retry in 40.377128501s.\",\n    \"status\": \"RE",
-        "last_error_full": "HTTP 429 from Gemini API: {\n  \"error\": {\n    \"code\": 429,\n    \"message\": \"You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3-flash\\nPlease retry in 40.377128501s.\",\n    \"status\": \"RESOURCE_EXHAUSTED\",\n    \"details\": [\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.Help\",\n        \"links\": [\n          {\n            \"description\": \"Learn more about Gemini API quotas\",\n            \"url\": \"https://ai.google.dev/gemini-api/docs/rate-limits\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.QuotaFailure\",\n        \"violations\": [\n          {\n            \"quotaMetric\": \"generativelanguage.googleapis.com/generate_content_free_tier_requests\",\n            \"quotaId\": \"GenerateRequestsPerDayPerProjectPerModel-FreeTier\",\n            \"quotaDimensions\": {\n              \"location\": \"global\",\n              \"model\": \"gemini-3-flash\"\n            },\n            \"quotaValue\": \"20\"\n          }\n        ]\n      },\n      {\n        \"@type\": \"type.googleapis.com/google.rpc.RetryInfo\",\n        \"retryDelay\": \"40s\"\n      }\n    ]\n  }\n}",
-        "last_error_at_utc": "2026-02-16T07:55:19+00:00"
+        "requests_today": 1,
+        "blocked_today": false,
+        "last_error": null,
+        "last_error_full": null,
+        "last_error_at_utc": null
       },
       "gemini-2.5-flash": {
-        "requests_today": 12,
+        "requests_today": 0,
         "blocked_today": false,
         "last_error": null,
         "last_error_full": null,
@@ -95,5 +81,5 @@
       }
     }
   },
-  "last_price": 67980.1
+  "last_price": 1.4889
 }
