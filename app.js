@@ -145,8 +145,81 @@ function formatQty(value) {
   return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 6 }).format(qty);
 }
 
+function getDecisionBlock(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+  if (entry.decision && typeof entry.decision === "object") {
+    return entry.decision;
+  }
+  return null;
+}
+
+function getDecisionPayload(entry) {
+  const block = getDecisionBlock(entry);
+  if (!block) {
+    return null;
+  }
+  if (block.decision && typeof block.decision === "object") {
+    return block.decision;
+  }
+  return block;
+}
+
+function getDecisionExecution(entry) {
+  if (entry?.execution && typeof entry.execution === "object") {
+    return entry.execution;
+  }
+  const block = getDecisionBlock(entry);
+  if (block?.execution && typeof block.execution === "object") {
+    return block.execution;
+  }
+  return {};
+}
+
 function getDecisionSymbol(entry) {
-  return entry?.symbol || entry?.decision?.symbol || entry?.execution?.symbol || "-";
+  const decisionBlock = getDecisionBlock(entry);
+  const decisionPayload = getDecisionPayload(entry);
+  const execution = getDecisionExecution(entry);
+
+  const directSymbol = maybeFixText(
+    entry?.symbol ||
+    decisionBlock?.symbol ||
+    decisionPayload?.symbol ||
+    execution?.symbol ||
+    ""
+  );
+  if (directSymbol) {
+    return directSymbol;
+  }
+
+  if (Array.isArray(entry?.decisions)) {
+    const candidate = entry.decisions.find(
+      (item) => item && typeof item === "object" && (item.symbol || item?.decision?.symbol)
+    );
+    if (candidate) {
+      return maybeFixText(candidate.symbol || candidate?.decision?.symbol) || "-";
+    }
+  }
+
+  return "-";
+}
+
+function getDecisionConfidence(entry) {
+  const decisionPayload = getDecisionPayload(entry);
+  return toNumber(decisionPayload?.confidence);
+}
+
+function getDecisionPrice(entry) {
+  const decisionBlock = getDecisionBlock(entry);
+  const execution = getDecisionExecution(entry);
+  return (
+    toNumber(entry?.price) ??
+    toNumber(decisionBlock?.price) ??
+    toNumber(execution?.reference_price) ??
+    toNumber(execution?.executed_price) ??
+    null
+  );
 }
 
 function getDecisionId(entry) {
@@ -181,7 +254,7 @@ function getEntryDecisionBlocks(entry) {
   const seenSymbols = new Set();
 
   for (const block of blocks) {
-    const symbolKey = normalizeSymbolLookupKey(block?.symbol || entry?.symbol || "");
+    const symbolKey = normalizeSymbolLookupKey(block?.symbol || block?.decision?.symbol || entry?.symbol || "");
     if (symbolKey) {
       if (seenSymbols.has(symbolKey)) {
         continue;
@@ -196,6 +269,22 @@ function getEntryDecisionBlocks(entry) {
 
 function getEntryExecutionBlocks(entry) {
   const blocks = [];
+
+  if (Array.isArray(entry?.decisions)) {
+    for (const decisionBlock of entry.decisions) {
+      if (!decisionBlock || typeof decisionBlock !== "object") {
+        continue;
+      }
+
+      if (decisionBlock.execution && typeof decisionBlock.execution === "object") {
+        blocks.push(decisionBlock.execution);
+      }
+
+      if (Array.isArray(decisionBlock.executions)) {
+        blocks.push(...decisionBlock.executions.filter((item) => item && typeof item === "object"));
+      }
+    }
+  }
 
   if (Array.isArray(entry?.executions)) {
     blocks.push(...entry.executions.filter((item) => item && typeof item === "object"));
@@ -232,14 +321,22 @@ function getEntryExecutionBlocks(entry) {
 
 function createScopedDecisionEntry(entry, decision, execution, scopeIndex = 0, symbolHint = "") {
   const symbol =
-    maybeFixText(decision?.symbol || execution?.symbol || symbolHint || entry?.symbol || "-") || "-";
+    maybeFixText(decision?.symbol || decision?.decision?.symbol || execution?.symbol || symbolHint || entry?.symbol || "-") || "-";
   const scopedDecision = decision && typeof decision === "object" ? decision : null;
   const scopedExecution = execution && typeof execution === "object" ? execution : null;
+  const price =
+    toNumber(decision?.price) ??
+    toNumber(decision?.execution?.reference_price) ??
+    toNumber(decision?.execution?.executed_price) ??
+    toNumber(scopedExecution?.reference_price) ??
+    toNumber(scopedExecution?.executed_price) ??
+    toNumber(entry?.price);
   const scoped = {
     ...entry,
     symbol,
     decision: scopedDecision,
-    execution: scopedExecution
+    execution: scopedExecution,
+    ...(price !== null ? { price } : {})
   };
 
   const timestamp = scoped.timestamp_utc || "";
@@ -268,9 +365,10 @@ function getScopedDecisionEntries(entry) {
 
   if (decisions.length) {
     return decisions.map((decision, index) => {
-      const symbol = decision?.symbol || entry?.symbol || executions[index]?.symbol || "-";
+      const symbol = decision?.symbol || decision?.decision?.symbol || entry?.symbol || executions[index]?.symbol || "-";
       const symbolKey = normalizeSymbolLookupKey(symbol);
-      const execution = symbolKey ? executionBySymbol.get(symbolKey) || executions[index] || null : executions[index] || null;
+      const decisionExecution = decision?.execution && typeof decision.execution === "object" ? decision.execution : null;
+      const execution = decisionExecution || (symbolKey ? executionBySymbol.get(symbolKey) || executions[index] || null : executions[index] || null);
       return createScopedDecisionEntry(entry, decision, execution, index, symbol);
     });
   }
@@ -465,18 +563,60 @@ function normalizeAction(rawAction) {
 }
 
 function getAction(entry) {
+  const decisionPayload = getDecisionPayload(entry);
+  const decisionBlock = getDecisionBlock(entry);
+  const execution = getDecisionExecution(entry);
   const candidates = [
-    entry?.decision?.action_fr,
-    entry?.decision?.action,
-    entry?.execution?.action_fr,
-    entry?.execution?.action,
-    entry?.execution?.status_fr,
-    entry?.execution?.status
+    decisionPayload?.action_fr,
+    decisionPayload?.action,
+    decisionBlock?.action_fr,
+    decisionBlock?.action,
+    execution?.action_fr,
+    execution?.action,
+    execution?.status_fr,
+    execution?.status
   ];
 
   for (const item of candidates) {
     if (item) {
       return normalizeAction(item);
+    }
+  }
+
+  if (Array.isArray(entry?.decisions)) {
+    const perDecisionActions = [];
+
+    for (const block of entry.decisions) {
+      if (!block || typeof block !== "object") {
+        continue;
+      }
+
+      const blockDecision = block.decision && typeof block.decision === "object" ? block.decision : block;
+      const blockExecution = block.execution && typeof block.execution === "object" ? block.execution : {};
+      const blockCandidates = [
+        blockDecision?.action_fr,
+        blockDecision?.action,
+        blockExecution?.action_fr,
+        blockExecution?.action,
+        blockExecution?.status_fr,
+        blockExecution?.status
+      ];
+
+      for (const candidate of blockCandidates) {
+        if (!candidate) {
+          continue;
+        }
+        perDecisionActions.push(normalizeAction(candidate));
+        break;
+      }
+    }
+
+    const firstDirectional = perDecisionActions.find((action) => action !== "HOLD");
+    if (firstDirectional) {
+      return firstDirectional;
+    }
+    if (perDecisionActions.length) {
+      return perDecisionActions[0];
     }
   }
 
@@ -684,8 +824,8 @@ function buildSeries(decisions, portfolio) {
       date,
       total,
       action: getAction(entry),
-      symbol: entry.symbol || entry?.execution?.symbol || entry?.decision?.symbol || "-",
-      price: toNumber(entry?.price)
+      symbol: getDecisionSymbol(entry),
+      price: getDecisionPrice(entry)
     });
   }
 
@@ -748,22 +888,27 @@ function getDecisionModelSummary(entry) {
 function getDecisionMarketScore(entry) {
   const symbol = getDecisionSymbol(entry);
   const marketScores = entry?.market_scores;
-  if (!marketScores || typeof marketScores !== "object") {
-    return null;
+  if (marketScores && typeof marketScores === "object") {
+    if (symbol && marketScores[symbol] !== undefined) {
+      return toNumber(marketScores[symbol]);
+    }
+
+    const first = Object.values(marketScores)[0];
+    const firstScore = toNumber(first);
+    if (firstScore !== null) {
+      return firstScore;
+    }
   }
 
-  if (symbol && marketScores[symbol] !== undefined) {
-    return toNumber(marketScores[symbol]);
-  }
-
-  const first = Object.values(marketScores)[0];
-  return toNumber(first);
+  const decisionBlock = getDecisionBlock(entry);
+  return toNumber(decisionBlock?.local_market_score ?? entry?.local_market_score);
 }
 
 function getDecisionContextParts(entry) {
   const parts = [];
-  const strategyMode = maybeFixText(entry?.decision?.strategy_mode || "");
-  const regime = maybeFixText(entry?.decision?.regime_assessment || "");
+  const decisionPayload = getDecisionPayload(entry);
+  const strategyMode = maybeFixText(decisionPayload?.strategy_mode || "");
+  const regime = maybeFixText(decisionPayload?.regime_assessment || "");
   const timeframe = maybeFixText(entry?.timeframe || "");
   const score = getDecisionMarketScore(entry);
   const symbol = getDecisionSymbol(entry);
@@ -807,11 +952,17 @@ function getDecisionContextParts(entry) {
 }
 
 function getDecisionReasonText(entry) {
+  const decisionPayload = getDecisionPayload(entry);
+  const decisionBlock = getDecisionBlock(entry);
   const reasonCandidates = [
-    entry?.decision?.reason_fr,
-    entry?.decision?.reason,
-    entry?.decision?.rationale,
-    entry?.decision?.explanation
+    decisionPayload?.reason_fr,
+    decisionPayload?.reason,
+    decisionPayload?.rationale,
+    decisionPayload?.explanation,
+    decisionBlock?.reason_fr,
+    decisionBlock?.reason,
+    decisionBlock?.rationale,
+    decisionBlock?.explanation
   ];
 
   for (const candidate of reasonCandidates) {
@@ -824,11 +975,20 @@ function getDecisionReasonText(entry) {
 }
 
 function getDecisionRiskText(entry) {
+  const decisionPayload = getDecisionPayload(entry);
+  const decisionBlock = getDecisionBlock(entry);
   const riskCandidates = [
-    entry?.decision?.risk_note_fr,
-    entry?.decision?.risk_note,
-    entry?.decision?.risk,
-    entry?.decision?.risk_comment
+    decisionPayload?.risk_note_fr,
+    decisionPayload?.risk_note,
+    decisionPayload?.risk,
+    decisionPayload?.risk_comment,
+    decisionBlock?.risk_note_fr,
+    decisionBlock?.risk_note,
+    decisionBlock?.risk,
+    decisionBlock?.risk_comment,
+    decisionBlock?.risk?.risk_note,
+    decisionBlock?.risk?.reason,
+    decisionBlock?.risk?.risk
   ];
 
   for (const candidate of riskCandidates) {
@@ -956,7 +1116,7 @@ function initValueRangeSwitch() {
 }
 
 function getExecutionStatusInfo(entry) {
-  const execution = entry?.execution || {};
+  const execution = getDecisionExecution(entry);
   const action = getAction(entry);
   const qty = toNumber(execution.executed_qty) || 0;
   const notional = toNumber(execution.executed_notional_usdt) || 0;
@@ -1007,12 +1167,13 @@ function getInspectorExecutionToneClass(entry) {
 }
 
 function getDecisionExecutionSummary(entry, compact = false) {
-  const execution = entry?.execution || {};
+  const execution = getDecisionExecution(entry);
+  const decisionPayload = getDecisionPayload(entry);
   const statusInfo = getExecutionStatusInfo(entry);
   const qty = toNumber(execution.executed_qty) || 0;
   const notional = toNumber(execution.executed_notional_usdt) || 0;
   const fee = toNumber(execution.fee_usdt) || 0;
-  const allocation = toNumber(execution.allocation_pct ?? entry?.decision?.allocation_pct);
+  const allocation = toNumber(execution.allocation_pct ?? decisionPayload?.allocation_pct);
 
   if (compact) {
     if (statusInfo.isExecuted) {
@@ -1444,8 +1605,8 @@ function renderDecisionInspector(entry) {
   setActionBadge(el.inspectActionBadge, action);
   el.inspectTime.textContent = formatDate(entry?.timestamp_utc, true);
   el.inspectSymbol.textContent = getDecisionSymbol(entry);
-  el.inspectConfidence.textContent = formatConfidence(entry?.decision?.confidence);
-  el.inspectPrice.textContent = formatPrice(entry?.price);
+  el.inspectConfidence.textContent = formatConfidence(getDecisionConfidence(entry));
+  el.inspectPrice.textContent = formatPrice(getDecisionPrice(entry));
   el.inspectSentiment.textContent = formatSentimentText(sentiment);
   el.inspectModel.textContent = getDecisionModelSummary(entry);
   el.inspectSentiment.className = getSentimentTone(sentiment);
@@ -1599,8 +1760,8 @@ function renderDecisionsTable(decisions) {
     actionCell.appendChild(createBadge(action));
     row.appendChild(actionCell);
 
-    row.appendChild(makeCell(formatConfidence(entry?.decision?.confidence)));
-    row.appendChild(makeCell(formatPrice(entry?.price)));
+    row.appendChild(makeCell(formatConfidence(getDecisionConfidence(entry))));
+    row.appendChild(makeCell(formatPrice(getDecisionPrice(entry))));
     row.appendChild(makeCell(sentimentText, getSentimentTone(sentiment)));
     row.appendChild(makeCell(truncateText(reason, 120), "reason-snippet"));
 
@@ -1687,8 +1848,8 @@ function renderLatestDecision(latest) {
 
   setActionBadge(el.latestActionBadge, action);
   el.latestSymbol.textContent = getDecisionSymbol(latest);
-  el.latestPrice.textContent = formatPrice(latest.price);
-  el.latestConfidence.textContent = formatConfidence(latest?.decision?.confidence);
+  el.latestPrice.textContent = formatPrice(getDecisionPrice(latest));
+  el.latestConfidence.textContent = formatConfidence(getDecisionConfidence(latest));
   el.latestSentiment.textContent = sentimentText;
   el.latestModel.textContent = getDecisionModelSummary(latest);
   el.latestSentiment.className = getSentimentTone(sentiment);
@@ -1912,7 +2073,13 @@ function computeDashboard(decisions, portfolio) {
 
   const fees =
     toNumber(portfolio?.fees_paid_usdt) ??
-    sorted.reduce((sum, entry) => sum + (toNumber(entry?.execution?.fee_usdt) || 0), 0);
+    sorted.reduce((sum, entry) => {
+      const entryFees = getEntryExecutionBlocks(entry).reduce(
+        (innerSum, execution) => innerSum + (toNumber(execution?.fee_usdt) || 0),
+        0
+      );
+      return sum + entryFees;
+    }, 0);
 
   const tradeCount =
     toNumber(portfolio?.trade_count) ??
